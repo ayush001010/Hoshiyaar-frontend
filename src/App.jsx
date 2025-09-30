@@ -1,11 +1,25 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext.jsx'; // Import the AuthProvider with .jsx
+import { AuthProvider } from './context/AuthContext.jsx';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './components/HomePage';
 import Login from './components/AuthPages/Login';
 import Signup from './components/AuthPages/Signup';
+import LoadingPage from './components/LoadingPage.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx'; // Import the ProtectedRoute
+import Learn from './components/Learn/Learn.jsx'; // Import the new Learn component
+import ConceptPage from './components/Learn/ConceptPage.jsx';
+import McqPage from './components/Learn/McqPage.jsx';
+import FillupsPage from './components/Learn/FillupsPage.jsx';
+import RearrangePage from './components/Learn/RearrangePage.jsx';
+import ModuleEntryRedirect from './components/Learn/ModuleEntryRedirect.jsx';
+import LessonEntryRedirectByTitle from './components/Learn/LessonEntryRedirectByTitle.jsx';
+import ConceptIntro from './components/Learn/Concepts/ConceptIntro.jsx';
+import ConceptImages2 from './components/Learn/Concepts/ConceptImages2.jsx';
+import ConceptQuiz from './components/Learn/Concepts/ConceptQuiz.jsx';
+import LessonComplete from './components/Learn/LessonComplete.jsx';
+import UploadTest from './components/Admin/UploadTest.jsx';
 
 const MainLayout = ({ children }) => (
   <div className="font-sans">
@@ -17,17 +31,84 @@ const MainLayout = ({ children }) => (
 
 function App() {
   return (
-    // Wrap the Router with AuthProvider
     <AuthProvider>
       <Router>
         <Routes>
+          {/* Public Routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/loading" element={<LoadingPage />} />
+
+          {/* Home Page Route */}
           <Route path="/" element={
             <MainLayout>
               <HomePage />
             </MainLayout>
           } />
+
+          {/* Protected Learning Route */}
+          <Route 
+            path="/learn" 
+            element={
+              <ProtectedRoute>
+                <Learn />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/learn/module/:moduleNumber" 
+            element={
+              <ProtectedRoute>
+                <ModuleEntryRedirect />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/learn/module/:moduleNumber/lesson/:title" 
+            element={
+              <ProtectedRoute>
+                <LessonEntryRedirectByTitle />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/learn/module/:moduleNumber/concept/:index" 
+            element={
+              <ProtectedRoute>
+                <ConceptPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/learn/module/:moduleNumber/mcq/:index" 
+            element={
+              <ProtectedRoute>
+                <McqPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/learn/module/:moduleNumber/fillups/:index" 
+            element={
+              <ProtectedRoute>
+                <FillupsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/learn/module/:moduleNumber/rearrange/:index" 
+            element={
+              <ProtectedRoute>
+                <RearrangePage />
+              </ProtectedRoute>
+            } 
+          />
+          {/* Concept demo flow (public for now) */}
+          <Route path="/concept" element={<ConceptIntro />} />
+          <Route path="/concept/step2" element={<ConceptImages2 />} />
+          <Route path="/concept/quiz" element={<ConceptQuiz />} />
+          <Route path="/lesson-complete" element={<LessonComplete />} />
+          <Route path="/admin/upload-test" element={<UploadTest />} />
         </Routes>
       </Router>
     </AuthProvider>

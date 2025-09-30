@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Utility to hide scrollbars while keeping scroll behavior */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 /* src/index.css */
 
 /* Add this to hide the spin buttons on number inputs */
