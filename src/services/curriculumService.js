@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+const API = import.meta.env.VITE_API_BASE || (window?.location?.hostname === 'localhost' ? 'http://localhost:5000' : '');
 
 const curriculumService = {
   listBoards() {
