@@ -125,6 +125,20 @@ function App() {
           <Route path="/revision" element={<RevisionList />} />
             
           <Route path="/admin/upload-test" element={<UploadTest />} />
+          
+          {/* Handle direct access to index.html */}
+          <Route path="/index.html" element={
+            <MainLayout>
+              <HomePage />
+            </MainLayout>
+          } />
+          
+          {/* Catch-all route for SPA routing */}
+          <Route path="*" element={
+            <MainLayout>
+              <HomePage />
+            </MainLayout>
+          } />
         </Routes>
         </Router>
       </ReviewProvider>

@@ -1,6 +1,9 @@
 # Redirect all routes to index.html for SPA routing
 /*    /index.html   200
 
+# Handle direct access to index.html - redirect to root
+/index.html    /    200
+
 # Specific route redirects for better compatibility
 /learn    /index.html    200
 /learn/*  /index.html    200
