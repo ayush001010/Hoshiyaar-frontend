@@ -8,6 +8,8 @@ import HomePage from './components/layout/HomePage';
 import Login from './components/forms/Login';
 import Signup from './components/forms/Signup';
 import LoadingPage from './components/ui/LoadingPage.jsx';
+import RenderLoadingScreen from './components/ui/RenderLoadingScreen.jsx';
+import useRenderLoading from './hooks/useRenderLoading.js';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx'; // Import the ProtectedRoute
 import Learn from './components/Learn/pages/Learn.jsx'; // Import the new Learn component
 import ReviewRound from './components/Learn/quiz/ReviewRound.jsx';
@@ -34,6 +36,13 @@ const MainLayout = ({ children }) => (
 );
 
 function App() {
+  const { isLoading, loadingReason } = useRenderLoading();
+
+  // Show Render loading screen if app is loading due to Render spin-up
+  if (isLoading && loadingReason === 'render-spinup') {
+    return <RenderLoadingScreen />;
+  }
+
   return (
     <AuthProvider>
       <ReviewProvider>
@@ -43,6 +52,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/loading" element={<LoadingPage />} />
+          <Route path="/render-loading" element={<RenderLoadingScreen />} />
 
           {/* Home Page Route */}
           <Route path="/" element={
@@ -125,20 +135,6 @@ function App() {
           <Route path="/revision" element={<RevisionList />} />
             
           <Route path="/admin/upload-test" element={<UploadTest />} />
-          
-          {/* Handle direct access to index.html */}
-          <Route path="/index.html" element={
-            <MainLayout>
-              <HomePage />
-            </MainLayout>
-          } />
-          
-          {/* Catch-all route for SPA routing */}
-          <Route path="*" element={
-            <MainLayout>
-              <HomePage />
-            </MainLayout>
-          } />
         </Routes>
         </Router>
       </ReviewProvider>

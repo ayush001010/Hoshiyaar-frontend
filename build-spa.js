@@ -1,40 +1,26 @@
 import { build } from 'vite';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 
 // Build the application
 await build();
 
-// Function to copy file if it exists
-function copyIfExists(source, dest) {
-  if (existsSync(source)) {
-    copyFileSync(source, dest);
-    console.log(`✅ Copied ${source} to ${dest}`);
-    return true;
-  }
-  return false;
+// Copy _redirects file to dist if it exists
+const redirectsSource = 'public/_redirects';
+const redirectsDest = 'dist/_redirects';
+
+if (existsSync(redirectsSource)) {
+  copyFileSync(redirectsSource, redirectsDest);
+  console.log('✅ Copied _redirects file to dist');
 }
 
-// Copy all redirect and configuration files
-const filesToCopy = [
-  { source: 'public/_redirects', dest: 'dist/_redirects' },
-  { source: 'public/404.html', dest: 'dist/404.html' },
-  { source: 'public/.htaccess', dest: 'dist/.htaccess' },
-  { source: 'vercel.json', dest: 'dist/vercel.json' },
-  { source: 'netlify.toml', dest: 'dist/netlify.toml' }
-];
+// Copy 404.html to dist if it exists
+const notFoundSource = 'public/404.html';
+const notFoundDest = 'dist/404.html';
 
-let copiedCount = 0;
-filesToCopy.forEach(({ source, dest }) => {
-  if (copyIfExists(source, dest)) {
-    copiedCount++;
-  }
-});
-
-// Ensure dist directory exists
-if (!existsSync('dist')) {
-  mkdirSync('dist', { recursive: true });
+if (existsSync(notFoundSource)) {
+  copyFileSync(notFoundSource, notFoundDest);
+  console.log('✅ Copied 404.html file to dist');
 }
 
-console.log(`✅ SPA build completed with ${copiedCount} redirect files`);
-console.log('✅ All SPA routing configurations applied');
+console.log('✅ SPA build completed with redirects');

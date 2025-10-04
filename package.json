@@ -7,13 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "build:spa": "node build-spa.js",
-    "start": "node server.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "axios": "^1.12.2",
-    "express": "^4.18.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.1"
