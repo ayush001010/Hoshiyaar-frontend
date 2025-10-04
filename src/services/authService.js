@@ -1,8 +1,15 @@
 import axios from 'axios';
 
 // The base URL of your backend API
-const BASE = import.meta.env.VITE_API_BASE || (window?.location?.hostname === 'localhost' ? 'http://localhost:5000' : '');
+// For local development: use empty string to leverage Vite proxy
+// For production: use the full backend URL
+const BASE = import.meta.env.VITE_API_BASE || '';
 const API_URL = `${BASE}/api/auth/`;
+
+// Debug logging
+console.log('API_URL:', API_URL);
+console.log('Environment:', import.meta.env.DEV ? 'development' : 'production');
+console.log('BASE:', BASE);
 
 // Register user
 const register = (userData) => {

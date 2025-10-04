@@ -2,28 +2,28 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ReviewProvider } from './context/ReviewContext.jsx';
-import Header from './components/Header';
-import Footer from './components/Footer';
-import HomePage from './components/HomePage';
-import Login from './components/AuthPages/Login';
-import Signup from './components/AuthPages/Signup';
-import LoadingPage from './components/LoadingPage.jsx';
-import ProtectedRoute from './components/ProtectedRoute.jsx'; // Import the ProtectedRoute
-import Learn from './components/Learn/Learn.jsx'; // Import the new Learn component
-import ReviewRound from './components/Learn/ReviewRound.jsx';
-import RevisionList from './components/Learn/RevisionList.jsx';
-import ConceptPage from './components/Learn/ConceptPage.jsx';
-import McqPage from './components/Learn/McqPage.jsx';
-import FillupsPage from './components/Learn/FillupsPage.jsx';
-import RearrangePage from './components/Learn/RearrangePage.jsx';
-import ModuleEntryRedirect from './components/Learn/ModuleEntryRedirect.jsx';
-import LessonEntryRedirectByTitle from './components/Learn/LessonEntryRedirectByTitle.jsx';
+import Header from './components/layout/Header';
+import Footer from './components/layout/Footer';
+import HomePage from './components/layout/HomePage';
+import Login from './components/forms/Login';
+import Signup from './components/forms/Signup';
+import LoadingPage from './components/ui/LoadingPage.jsx';
+import ProtectedRoute from './components/layout/ProtectedRoute.jsx'; // Import the ProtectedRoute
+import Learn from './components/Learn/pages/Learn.jsx'; // Import the new Learn component
+import ReviewRound from './components/Learn/quiz/ReviewRound.jsx';
+import RevisionList from './components/Learn/quiz/RevisionList.jsx';
+import ConceptPage from './components/Learn/pages/ConceptPage.jsx';
+import McqPage from './components/Learn/quiz/McqPage.jsx';
+import FillupsPage from './components/Learn/quiz/FillupsPage.jsx';
+import RearrangePage from './components/Learn/quiz/RearrangePage.jsx';
+import ModuleEntryRedirect from './components/Learn/pages/ModuleEntryRedirect.jsx';
+import LessonEntryRedirectByTitle from './components/Learn/pages/LessonEntryRedirectByTitle.jsx';
 import ConceptIntro from './components/Learn/Concepts/ConceptIntro.jsx';
 import ConceptImages2 from './components/Learn/Concepts/ConceptImages2.jsx';
 import ConceptQuiz from './components/Learn/Concepts/ConceptQuiz.jsx';
-import LessonComplete from './components/Learn/LessonComplete.jsx';
-import UploadTest from './components/Admin/UploadTest.jsx';
-import ProfilePage from './components/Profile/ProfilePage.jsx';
+import LessonComplete from './components/Learn/pages/LessonComplete.jsx';
+import UploadTest from './components/features/UploadTest.jsx';
+import ProfilePage from './components/features/ProfilePage.jsx';
 
 const MainLayout = ({ children }) => (
   <div className="font-sans">

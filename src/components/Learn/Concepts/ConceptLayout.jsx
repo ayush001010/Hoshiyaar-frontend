@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import ConceptExitConfirm from './ConceptExitConfirm.jsx';
+import ConceptExitConfirm from '../../modals/ConceptExitConfirm.jsx';
 
 const ConceptLayout = ({ children, footer, onQuit }) => {
   const [showExitConfirm, setShowExitConfirm] = useState(false);

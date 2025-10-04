@@ -1,9 +1,7 @@
 import axios from 'axios';
 
-// Prefer localhost while developing to avoid undeployed routes on hosted env
-const API = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
-  ? 'http://localhost:5000'
-  : (import.meta.env.VITE_API_BASE || '');
+// Use proxy for local development
+const API = import.meta.env.VITE_API_BASE || '';
 
 const reviewService = {
   async listIncorrect(userId, moduleId, chapterId) {

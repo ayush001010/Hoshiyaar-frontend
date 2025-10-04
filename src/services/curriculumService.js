@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Prefer local API in development unless explicitly overridden
-const API = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
+// Use proxy for local development
+const API = import.meta.env.VITE_API_BASE || '';
 
 const curriculumService = {
   listBoards() {

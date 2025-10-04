@@ -1,4 +1,4 @@
-const API_BASE = import.meta?.env?.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta?.env?.VITE_API_BASE || '';
 
 export async function fetchLessonItemsByModule(moduleNumber) {
   const response = await fetch(`${API_BASE}/api/lessons/${moduleNumber}`);
