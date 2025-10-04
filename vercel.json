@@ -5,6 +5,28 @@
       "destination": "/index.html"
     }
   ],
+  "redirects": [
+    {
+      "source": "/learn",
+      "destination": "/index.html",
+      "permanent": false
+    },
+    {
+      "source": "/learn/(.*)",
+      "destination": "/index.html",
+      "permanent": false
+    },
+    {
+      "source": "/profile",
+      "destination": "/index.html",
+      "permanent": false
+    },
+    {
+      "source": "/revision",
+      "destination": "/index.html",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
@@ -12,6 +34,15 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
         }
       ]
     }

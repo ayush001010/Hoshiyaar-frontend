@@ -1,8 +1,17 @@
 # Redirect all routes to index.html for SPA routing
 /*    /index.html   200
 
-# Handle API routes (if any)
+# Specific route redirects for better compatibility
+/learn    /index.html    200
+/learn/*  /index.html    200
+/profile  /index.html    200
+/revision /index.html    200
+/login    /index.html    200
+/signup   /index.html    200
+/dashboard /index.html    200
+
+# API routes (if needed)
 /api/*    https://hoshiyaar-backend.onrender.com/api/:splat    200
 
-# Handle static assets
+# Static assets
 /assets/*    /assets/:splat    200

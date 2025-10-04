@@ -23,8 +23,11 @@ export default defineConfig({
       },
     },
   },
+  // Add SPA fallback for development
   preview: {
     port: 4173,
     host: true,
+    // Ensure SPA routing works in preview
+    historyApiFallback: true,
   },
 });
