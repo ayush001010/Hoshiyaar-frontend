@@ -1,5 +1,13 @@
-# SPA routing - serve index.html for all routes except static assets
+# SPA routing - serve index.html for all routes
 /*    /index.html   200
+
+# Specific routes for better compatibility
+/login    /index.html   200
+/signup   /index.html   200
+/learn    /index.html   200
+/learn/*  /index.html   200
+/profile  /index.html   200
+/revision /index.html   200
 
 # API routes (if needed)
 /api/*    https://hoshiyaar-backend.onrender.com/api/:splat    200

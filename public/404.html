@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HoshiYaar - Learning Platform</title>
     <script>
-        // For SPA routing, let React Router handle the current URL
-        // Don't redirect, just let the app load
-        console.log('404 page loaded, letting React Router handle routing');
+        // Redirect to index.html to let React Router handle the routing
+        console.log('404 page loaded, redirecting to index.html');
+        window.location.replace('/index.html' + window.location.search + window.location.hash);
     </script>
 </head>
 <body>
