@@ -34,7 +34,7 @@ const ConceptQuiz = ({ question = "Which is blood in it's correct form", onConti
   };
 
   return (
-    <ConceptLayout progress={progress} onClose={() => navigate('/learn')}
+    <ConceptLayout
       footer={
         <div>
           {validated && (

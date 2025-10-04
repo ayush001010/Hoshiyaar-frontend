@@ -18,11 +18,18 @@ const Learn = () => {
   });
   const { user, loading } = useAuth();
 
+  const getScopedKeys = (uid) => ({
+    local: `learnOnboarded_${uid}`,
+    session: `learnWasOnDashboard_${uid}`,
+  });
+
   const nextStep = () => {
     setStep(prevStep => {
       const next = prevStep + 1;
-      if (next >= 5) {
-        try { localStorage.setItem('learnOnboarded', 'true'); } catch (_) {}
+      if (next >= 5 && user?._id) {
+        const keys = getScopedKeys(user._id);
+        try { localStorage.setItem(keys.local, 'true'); } catch (_) {}
+        try { sessionStorage.setItem(keys.session, 'true'); } catch (_) {}
       }
       return next;
     });
@@ -39,51 +46,53 @@ const Learn = () => {
 
   // Persist dashboard state across refreshes
   useEffect(() => {
-    if (step === 5) {
-      try { sessionStorage.setItem('learnWasOnDashboard', 'true'); } catch (_) {}
+    if (step === 5 && user?._id) {
+      const keys = getScopedKeys(user._id);
+      try { sessionStorage.setItem(keys.session, 'true'); } catch (_) {}
+      try { localStorage.setItem(keys.local, 'true'); } catch (_) {}
     }
-  }, [step]);
+  }, [step, user]);
 
   // On mount, decide based on user.board and persisted state; avoid welcome flash
   useEffect(() => {
     const checkOnboardingStatus = async () => {
       try {
-        console.log('=== ONBOARDING DEBUG START ===');
-        console.log('Loading state:', loading);
-        console.log('Current user object:', user);
-        console.log('User ID:', user?._id);
-        
-        // Wait for auth to load
         if (loading) {
-          console.log('Auth still loading, waiting...');
           return;
         }
-        // If not logged in, do nothing here
         if (!user?._id) return;
 
-        // Allow forcing dashboard via query (?go=dashboard)
         const params = new URLSearchParams(window.location.search);
         const go = params.get('go');
 
-        // If onboardingCompleted true or query requests dashboard -> dashboard; else -> onboarding once
-        if (user.onboardingCompleted || go === 'dashboard') {
-          setOnboardingData({
-            board: user.board ?? null,
-            subject: user.subject ?? null,
-            chapter: user.chapter ?? null,
-          });
-          setStep(5);
+        const keys = getScopedKeys(user._id);
+        let localFlag = false;
+        try {
+          localFlag = (localStorage.getItem(keys.local) === 'true') || (sessionStorage.getItem(keys.session) === 'true');
+        } catch (_) {}
+
+        const hasUserSelections = Boolean(user.board) && Boolean(user.subject) && Boolean(user.chapter);
+
+        // First-time user with no selections and no scoped flags: start onboarding
+        if (!go && !user.onboardingCompleted && !localFlag && !hasUserSelections) {
+          setStep(1);
           return;
         }
 
-        // Otherwise start onboarding once (sign up flow) with Welcome
-        setStep(1);
+        // Otherwise go to dashboard
+        setOnboardingData({
+          board: user.board ?? onboardingData.board,
+          subject: user.subject ?? onboardingData.subject,
+          chapter: user.chapter ?? onboardingData.chapter,
+        });
+        setStep(5);
       } catch (_) {
         // ignore storage errors
       }
     };
 
     checkOnboardingStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loading]);
 
   const renderStep = () => {
@@ -106,6 +115,7 @@ const Learn = () => {
                     board: onboardingData.board,
                     subject: onboardingData.subject,
                     chapter: onboardingData.chapter,
+                    onboardingCompleted: true,
                   });
                 }
               } catch (e) {
@@ -118,17 +128,12 @@ const Learn = () => {
           />
         );
       case 5:
-        // After chapter selection, show the main dashboard
         return <LearnDashboard onboardingData={onboardingData} />;
       default:
-        // If the user gets past the last step, just show the dashboard
         return <LearnDashboard onboardingData={onboardingData} />;
     }
   };
-  
-  // Do not short-circuit to dashboard here; respect `step` decided above
-  
-  // Unified full-page white layout across onboarding and dashboard
+
   return (
     <div className="bg-white min-h-screen">
       {loading ? <SimpleLoading /> : renderStep()}

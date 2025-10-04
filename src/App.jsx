@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { ReviewProvider } from './context/ReviewContext.jsx';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './components/HomePage';
@@ -9,6 +10,8 @@ import Signup from './components/AuthPages/Signup';
 import LoadingPage from './components/LoadingPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx'; // Import the ProtectedRoute
 import Learn from './components/Learn/Learn.jsx'; // Import the new Learn component
+import ReviewRound from './components/Learn/ReviewRound.jsx';
+import RevisionList from './components/Learn/RevisionList.jsx';
 import ConceptPage from './components/Learn/ConceptPage.jsx';
 import McqPage from './components/Learn/McqPage.jsx';
 import FillupsPage from './components/Learn/FillupsPage.jsx';
@@ -20,6 +23,7 @@ import ConceptImages2 from './components/Learn/Concepts/ConceptImages2.jsx';
 import ConceptQuiz from './components/Learn/Concepts/ConceptQuiz.jsx';
 import LessonComplete from './components/Learn/LessonComplete.jsx';
 import UploadTest from './components/Admin/UploadTest.jsx';
+import ProfilePage from './components/Profile/ProfilePage.jsx';
 
 const MainLayout = ({ children }) => (
   <div className="font-sans">
@@ -32,7 +36,8 @@ const MainLayout = ({ children }) => (
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <ReviewProvider>
+        <Router>
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
@@ -52,6 +57,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <Learn />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
               </ProtectedRoute>
             } 
           />
@@ -108,9 +121,13 @@ function App() {
           <Route path="/concept/step2" element={<ConceptImages2 />} />
           <Route path="/concept/quiz" element={<ConceptQuiz />} />
           <Route path="/lesson-complete" element={<LessonComplete />} />
+          <Route path="/review-round" element={<ReviewRound />} />
+          <Route path="/revision" element={<RevisionList />} />
+            
           <Route path="/admin/upload-test" element={<UploadTest />} />
         </Routes>
-      </Router>
+        </Router>
+      </ReviewProvider>
     </AuthProvider>
   );
 }

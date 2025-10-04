@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import ProgressBar from './ProgressBar.jsx';
 import SimpleLoading from '../SimpleLoading.jsx';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useModuleItems } from './useModuleItems';
 import authService from '../../services/authService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import ConceptExitConfirm from './Concepts/ConceptExitConfirm.jsx';
 
 export default function ConceptPage() {
   const navigate = useNavigate();
@@ -13,6 +14,27 @@ export default function ConceptPage() {
   const { items, loading, error } = useModuleItems(moduleNumber);
   const { user } = useAuth();
   const item = useMemo(() => items[index] || null, [items, index]);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+
+  useEffect(() => {
+    const handlePop = () => {
+      setShowExitConfirm(true);
+      try { window.history.pushState(null, '', window.location.href); } catch (_) {}
+    };
+    const handleKey = (e) => {
+      if (e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setShowExitConfirm(true);
+      }
+    };
+    try { window.history.pushState(null, '', window.location.href); } catch (_) {}
+    window.addEventListener('popstate', handlePop);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('popstate', handlePop);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, []);
 
   function routeForType(type, idx) {
     switch (type) {
@@ -54,7 +76,7 @@ export default function ConceptPage() {
       {/* Header */}
       <div className="flex items-center justify-between p-4">
         <button 
-          onClick={() => navigate('/learn')}
+          onClick={() => setShowExitConfirm(true)}
           className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
         >
           ✕
@@ -89,7 +111,7 @@ export default function ConceptPage() {
             <div className="flex flex-wrap justify-center gap-5">
               {((item.images && item.images.filter(Boolean)) || (item.imageUrl ? [item.imageUrl] : [])).slice(0,5).map((src, i) => (
                 <div key={i} className="border border-blue-300 rounded-2xl p-3 bg-white shadow-sm">
-                  <img src={src} alt={"concept-"+i} className="h-80 w-64 object-contain rounded-xl" />
+                  <img src={src} alt={'concept-'+i} className="h-80 w-64 object-contain rounded-xl" />
                 </div>
               ))}
             </div>
@@ -106,6 +128,12 @@ export default function ConceptPage() {
           </button>
         </div>
       </div>
+
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-[9999]">
+          <ConceptExitConfirm onQuit={() => navigate('/learn')} onContinue={() => setShowExitConfirm(false)} />
+        </div>
+      )}
     </div>
   );
 }

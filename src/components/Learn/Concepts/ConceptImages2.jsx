@@ -7,7 +7,7 @@ const ConceptImages2 = ({ title = 'Blood is red in color', leftLabel = 'Image1',
   const [params] = useSearchParams();
   const chapter = params.get('chapter') || '1';
   return (
-    <ConceptLayout progress={progress} onClose={() => navigate('/learn')}
+    <ConceptLayout
       footer={<div className="text-center"><button onClick={onContinue || (()=>navigate(`/concept/quiz?chapter=${chapter}`))} className="bg-red-500 text-white font-bold py-2 px-6 rounded-lg transition-opacity duration-200 hover:opacity-90">Continue</button></div>}>
       <div className="text-left">
         <p className="text-sm text-gray-600 mb-2">Concept</p>

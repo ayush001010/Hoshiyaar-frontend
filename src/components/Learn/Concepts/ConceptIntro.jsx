@@ -25,17 +25,16 @@ const ConceptIntro = ({ title = 'What is Blood?', imageLabel = 'Image', text = "
     update();
   }, [user, chapter]);
 
-  // Keyboard: Enter to continue, Escape to close
+  // Keyboard: Enter to continue (remove Escape close; handled by layout)
   useEffect(() => {
     const handler = (e) => {
       if (e.key === 'Enter') navigate(`/concept/step2?chapter=${chapter}`);
-      if (e.key === 'Escape') navigate('/learn');
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [navigate, chapter]);
   return (
-    <ConceptLayout progress={progress} onClose={() => navigate('/learn')}
+    <ConceptLayout
       footer={<div className="text-center"><button onClick={onContinue || (()=>navigate(`/concept/step2?chapter=${chapter}`))} className="bg-red-500 text-white font-bold py-2 px-6 rounded-lg transition-opacity duration-200 hover:opacity-90">Continue</button></div>}>
       <div className="text-left">
         <p className="text-sm text-gray-600 mb-2">Concept</p>
