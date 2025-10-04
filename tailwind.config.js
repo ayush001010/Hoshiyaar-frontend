@@ -16,7 +16,7 @@ module.exports = {
         'duo-footer-blue': '#1a237e', // Custom color for the dark blue footer
       },
       fontFamily: {
-        sans: ['"Nunito"', 'sans-serif'],
+        sans: ['"Nunito"', 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       animation: {
         scroll: 'scroll 40s linear infinite',
