@@ -61,16 +61,19 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
     setShowTryAgainOption(false);
   }, [item, moduleNumber, index]);
 
-  // Block browser back and show exit confirm
+  // Allow browser back
+  useEffect(() => {}, []);
+
+  // Enter to submit/continue
   useEffect(() => {
-    const handlePop = () => {
-      setShowExitConfirm(true);
-      try { window.history.pushState(null, '', window.location.href); } catch (_) {}
+    const onKey = (e) => {
+      if (e.key !== 'Enter') return;
+      if (!item) return;
+      if (!showResult) handleSubmit(); else goNext();
     };
-    try { window.history.pushState(null, '', window.location.href); } catch (_) {}
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
-  }, []);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [item, showResult, userAnswer]);
 
   function routeForType(type, idx) {
     switch (type) {
@@ -233,15 +236,36 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
         </div>
       </div>
 
-      {/* Main Content - full-width white, large text, image box space */}
+      {/* Main Content - full-width white, large text */}
       <div className="flex-1 flex flex-col items-center px-6">
-        <div className="w-full max-w-3xl h-64 rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center mt-6">
-          <span className="text-gray-400">Image</span>
-        </div>
-
         <h2 className="text-3xl font-extrabold text-gray-900 text-center mt-8 mb-8">
           {item.question}
         </h2>
+
+        {/* Image block BETWEEN question and input. If no image, reserve space */}
+        {(() => {
+          const imgs = (item.images || []).filter(Boolean);
+          const primary = item.imageUrl ? [item.imageUrl] : [];
+          const list = imgs.length > 0 ? imgs : primary;
+          if (list.length === 0) {
+            return (
+              <div className="w-full max-w-4xl h-80 rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center mb-8">
+                <span className="text-gray-400">Image</span>
+              </div>
+            );
+          }
+          return (
+            <div className="w-full max-w-4xl mb-6 flex justify-center">
+              <div className="flex flex-wrap justify-center gap-5">
+                {list.slice(0, 5).map((src, i) => (
+                  <div key={i} className="border border-blue-300 rounded-2xl p-3 bg-white shadow-sm">
+                    <img src={src} alt={`fillup-${i}`} className="h-80 w-64 object-contain rounded-xl" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Text Input for fill-in-the-blank */}
         <div className="w-full max-w-3xl mb-6">
@@ -249,7 +273,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
               type="text"
               value={userAnswer}
               onChange={(e) => setUserAnswer(e.target.value)}
-              placeholder="Type your answer here..."
+              placeholder="Type the full word here..."
               disabled={showResult}
               className={`w-full p-5 text-xl border-2 rounded-2xl font-bold transition-all ${
                 showResult

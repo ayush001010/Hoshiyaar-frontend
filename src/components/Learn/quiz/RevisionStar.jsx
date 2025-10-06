@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import reviewService from '../../../services/reviewService.js';
+import curriculumService from '../../../services/curriculumService.js';
 import { useReview } from '../../../context/ReviewContext.jsx';
 
-export default function RevisionStar({ align = 'left', moduleId, chapterId }) {
+export default function RevisionStar({ align = 'left', moduleId, chapterId, unitId }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { reset, add } = useReview();
@@ -26,6 +27,28 @@ export default function RevisionStar({ align = 'left', moduleId, chapterId }) {
   const handleStart = async () => {
     if (!user) return;
     if (chapterId) {
+      // If unitId is provided, navigate directly to that unit's revision page
+      if (unitId) {
+        navigate(`/revision?chapterId=${encodeURIComponent(chapterId)}&unitId=${encodeURIComponent(unitId)}`);
+        return;
+      }
+      try {
+        const res = await curriculumService.listUnits(chapterId);
+        const arr = res?.data || [];
+        if (Array.isArray(arr) && arr.length > 0) {
+          // Prefer user's last opened unit for this chapter if available
+          let lastMap = {};
+          try { lastMap = JSON.parse(localStorage.getItem('last_unit_by_chapter') || '{}'); } catch (_) { lastMap = {}; }
+          const preferred = lastMap?.[chapterId];
+          const exists = arr.find(u => u?._id === preferred)?._id;
+          const targetUnitId = exists || arr[0]._id;
+          if (targetUnitId) {
+            navigate(`/revision?chapterId=${encodeURIComponent(chapterId)}&unitId=${encodeURIComponent(targetUnitId)}`);
+            return;
+          }
+        }
+      } catch (_) {}
+      // Fallback to chapter page if no units
       navigate(`/revision?chapterId=${encodeURIComponent(chapterId)}`);
     } else {
       navigate(`/revision?moduleId=${encodeURIComponent(moduleId || '')}`);

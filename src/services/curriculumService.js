@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-// Use proxy for local development
-const API = import.meta.env.VITE_API_BASE || '';
+// Prefer Vite proxy on localhost; use VITE_API_BASE only in non-local envs
+const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)/.test(window.location.hostname);
+const API = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || '');
 
 const curriculumService = {
   listBoards() {
@@ -13,8 +14,14 @@ const curriculumService = {
   listChapters(board = 'CBSE', subject = 'Science') {
     return axios.get(`${API}/api/curriculum/chapters`, { params: { board, subject } });
   },
+  listUnits(chapterId) {
+    return axios.get(`${API}/api/curriculum/units`, { params: { chapterId } });
+  },
   listModules(chapterId) {
     return axios.get(`${API}/api/curriculum/modules`, { params: { chapterId } });
+  },
+  listModulesByUnit(unitId) {
+    return axios.get(`${API}/api/curriculum/modules`, { params: { unitId } });
   },
   listItems(moduleId) {
     return axios.get(`${API}/api/curriculum/items`, { params: { moduleId } });

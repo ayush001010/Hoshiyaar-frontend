@@ -14,10 +14,18 @@ export default function UploadTest() {
   const [maxCount, setMaxCount] = useState(5);
 
   // Curriculum selection state
+  const [boards, setBoards] = useState([]);
+  const [board, setBoard] = useState('CBSE');
+  const [classes, setClasses] = useState([]);
+  const [classTitle, setClassTitle] = useState('');
+  const [subjects, setSubjects] = useState([]);
+  const [subject, setSubject] = useState('Science');
   const [chapters, setChapters] = useState([]);
+  const [units, setUnits] = useState([]);
   const [modules, setModules] = useState([]);
   const [items, setItems] = useState([]);
   const [chapterId, setChapterId] = useState('');
+  const [unitId, setUnitId] = useState('');
   const [moduleId, setModuleId] = useState('');
 
   const handleUpload = async (e) => {
@@ -82,28 +90,91 @@ export default function UploadTest() {
     }
   };
 
-  // Load chapters on mount
+  const handleRemoveAllFromDb = async () => {
+    try {
+      setError('');
+      if (!itemId) throw new Error('Select CurriculumItem');
+      if (!window.confirm('Remove all images from this item?')) return;
+      const resp = await fetch(`/api/curriculum/items/${itemId}/image`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images: [], imagePublicIds: [], append: false })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.message || 'Remove failed');
+      setToast({ open: true, type: 'success', text: 'Removed all images!', hideAt: Date.now() + 2000 });
+    } catch (e) {
+      setError(e.message);
+      setToast({ open: true, type: 'error', text: e.message || 'Remove failed', hideAt: Date.now() + 2000 });
+    }
+  };
+
+  // Load boards on mount
   React.useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/curriculum/chapters?board=CBSE&subject=Science');
-        const data = await res.json();
-        setChapters(Array.isArray(data) ? data : []);
+        const b = await fetch('/api/curriculum/boards').then(r=>r.json());
+        setBoards(Array.isArray(b) ? b : []);
       } catch (_) {}
     })();
   }, []);
 
-  // Load modules when chapter changes
+  // Load classes for board
   React.useEffect(() => {
-    if (!chapterId) { setModules([]); setModuleId(''); setItems([]); setItemId(''); return; }
     (async () => {
       try {
-        const res = await fetch(`/api/curriculum/modules?chapterId=${chapterId}`);
-        const data = await res.json();
-        setModules(Array.isArray(data) ? data : []);
+        const c = await fetch(`/api/curriculum/classes?board=${encodeURIComponent(board)}`).then(r=>r.json());
+        setClasses(Array.isArray(c) ? c : []);
+      } catch (_) { setClasses([]); }
+    })();
+  }, [board]);
+
+  // Load subjects for board(+class)
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const url = `/api/curriculum/subjects?board=${encodeURIComponent(board)}${classTitle ? `&classTitle=${encodeURIComponent(classTitle)}` : ''}`;
+        const s = await fetch(url).then(r=>r.json());
+        setSubjects(Array.isArray(s) ? s : []);
+      } catch (_) { setSubjects([]); }
+    })();
+  }, [board, classTitle]);
+
+  // Load chapters when board/subject/class change
+  React.useEffect(() => {
+    (async () => {
+      if (!board || !subject) { setChapters([]); setChapterId(''); return; }
+      try {
+        const url = `/api/curriculum/chapters?board=${encodeURIComponent(board)}&subject=${encodeURIComponent(subject)}${classTitle ? `&classTitle=${encodeURIComponent(classTitle)}` : ''}`;
+        const data = await fetch(url).then(r=>r.json());
+        setChapters(Array.isArray(data) ? data : []);
+      } catch (_) { setChapters([]); }
+    })();
+  }, [board, subject, classTitle]);
+
+  // Load units and modules when chapter changes
+  React.useEffect(() => {
+    if (!chapterId) { setUnits([]); setModules([]); setUnitId(''); setModuleId(''); setItems([]); setItemId(''); return; }
+    (async () => {
+      try {
+        const u = await fetch(`/api/curriculum/units?chapterId=${chapterId}`).then(r=>r.json());
+        setUnits(Array.isArray(u) ? u : []);
+        const res = await fetch(`/api/curriculum/modules?chapterId=${chapterId}`).then(r=>r.json());
+        setModules(Array.isArray(res) ? res : []);
       } catch (_) {}
     })();
   }, [chapterId]);
+
+  // Reload modules when unit changes
+  React.useEffect(() => {
+    (async () => {
+      if (!unitId) return; // optional
+      try {
+        const m = await fetch(`/api/curriculum/modules?unitId=${unitId}`).then(r=>r.json());
+        setModules(Array.isArray(m) ? m : []);
+      } catch (_) {}
+    })();
+  }, [unitId]);
 
   // Load items when module changes
   React.useEffect(() => {
@@ -159,7 +230,7 @@ export default function UploadTest() {
           {(file || files.length > 0) && (
             <div className="mb-5 flex items-center gap-3">
               {files.length > 0 ? (
-                <div className="text-sm text-gray-700 truncate max-w-[60%]">{files.length} files selected (max {maxCount} will upload)</div>
+                <div className="text-sm text-gray-700 truncate max-w-[60%]">{files.length} files selected</div>
               ) : (
                 <div className="text-sm text-gray-700 truncate max-w-[60%]">{file?.name}</div>
               )}
@@ -170,13 +241,7 @@ export default function UploadTest() {
             </div>
           )}
 
-          {/* Limit selector */}
-          <div className="mb-4">
-            <label className="text-sm text-gray-600 mr-2">Max images to upload:</label>
-            <select value={maxCount} onChange={(e) => setMaxCount(Number(e.target.value))} className="border rounded-xl px-3 py-1">
-              {[1,2,3,4,5].map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
+          {/* Optional: limit selector (hidden as per request) */}
 
           <button
             onClick={handleUpload}
@@ -198,21 +263,28 @@ export default function UploadTest() {
                   <span className="text-xs text-gray-500 truncate">{url}</span>
                 </div>
               )}
-          {/* Linked selectors (Board/Subject/Chapter/Module/Item) */}
-          <div className="mt-5 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {/* Board (fixed CBSE for now) */}
-                <select value={'CBSE'} disabled className="border rounded-xl px-3 py-2 bg-gray-100 text-gray-600">
-                  <option>CBSE</option>
+          {/* Linked selectors from Board → Subject → Chapter → Unit → Module → Item */}
+          <div className="mt-5 grid grid-cols-1 md:grid-cols-6 gap-3">
+                <select value={board} onChange={(e)=>{ setBoard(e.target.value); setChapterId(''); setUnitId(''); setModuleId(''); setItemId(''); }} className="border rounded-xl px-3 py-2">
+                  {boards.map(b => (<option key={b._id || b.name} value={b.name || b._id}>{b.name || b.title || 'Board'}</option>))}
                 </select>
-                {/* Subject (fixed Science for now) */}
-                <select value={'Science'} disabled className="border rounded-xl px-3 py-2 bg-gray-100 text-gray-600 hidden md:block">
-                  <option>Science</option>
+                <select value={classTitle} onChange={(e)=>{ setClassTitle(e.target.value); setChapterId(''); setUnitId(''); setModuleId(''); setItemId(''); }} className="border rounded-xl px-3 py-2">
+                  <option value="">Class</option>
+                  {classes.map(c => (<option key={c._id} value={c.name}>{c.name}</option>))}
+                </select>
+                <select value={subject} onChange={(e)=>{ setSubject(e.target.value); setChapterId(''); setUnitId(''); setModuleId(''); setItemId(''); }} className="border rounded-xl px-3 py-2">
+                  <option value="">Subject</option>
+                  {subjects.map(s => (<option key={s._id} value={s.name}>{s.name}</option>))}
                 </select>
                 <select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="border rounded-xl px-3 py-2">
                   <option value="">Select Chapter</option>
                   {chapters.map(c => (
                     <option key={c._id} value={c._id}>{c.title}</option>
                   ))}
+                </select>
+                <select value={unitId} onChange={(e)=>{ setUnitId(e.target.value); setModuleId(''); setItemId(''); }} className="border rounded-xl px-3 py-2" disabled={!chapterId || units.length===0}>
+                  <option value="">Unit (optional)</option>
+                  {units.map(u => (<option key={u._id} value={u._id}>{u.title}</option>))}
                 </select>
                 <select value={moduleId} onChange={(e) => setModuleId(e.target.value)} className="border rounded-xl px-3 py-2" disabled={!chapterId}>
                   <option value="">Select Module</option>
@@ -227,7 +299,12 @@ export default function UploadTest() {
                   ))}
                 </select>
               </div>
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex justify-between">
+                <button
+                  onClick={handleRemoveAllFromDb}
+                  className="px-4 py-2 rounded-xl bg-red-500 text-white font-bold"
+                  disabled={!itemId}
+                >Remove all images</button>
                 <button
                   onClick={handleSaveToDb}
                   className="px-4 py-2 rounded-xl bg-green-500 text-white font-bold"

@@ -8,22 +8,17 @@ import HomePage from './components/layout/HomePage';
 import Login from './components/forms/Login';
 import Signup from './components/forms/Signup';
 import LoadingPage from './components/ui/LoadingPage.jsx';
-import RenderLoadingScreen from './components/ui/RenderLoadingScreen.jsx';
-import useRenderLoading from './hooks/useRenderLoading.js';
 import ProtectedRoute from './components/layout/ProtectedRoute.jsx'; // Import the ProtectedRoute
 import Learn from './components/Learn/pages/Learn.jsx'; // Import the new Learn component
 import ReviewRound from './components/Learn/quiz/ReviewRound.jsx';
 import RevisionList from './components/Learn/quiz/RevisionList.jsx';
-import ConceptPage from './components/Learn/pages/ConceptPage.jsx';
 import McqPage from './components/Learn/quiz/McqPage.jsx';
 import FillupsPage from './components/Learn/quiz/FillupsPage.jsx';
 import RearrangePage from './components/Learn/quiz/RearrangePage.jsx';
 import ModuleEntryRedirect from './components/Learn/pages/ModuleEntryRedirect.jsx';
 import LessonEntryRedirectByTitle from './components/Learn/pages/LessonEntryRedirectByTitle.jsx';
-import ConceptIntro from './components/Learn/Concepts/ConceptIntro.jsx';
-import ConceptImages2 from './components/Learn/Concepts/ConceptImages2.jsx';
-import ConceptQuiz from './components/Learn/Concepts/ConceptQuiz.jsx';
 import LessonComplete from './components/Learn/pages/LessonComplete.jsx';
+import ConceptPage from './components/Learn/pages/ConceptPage.jsx';
 import UploadTest from './components/features/UploadTest.jsx';
 import ProfilePage from './components/features/ProfilePage.jsx';
 
@@ -36,13 +31,6 @@ const MainLayout = ({ children }) => (
 );
 
 function App() {
-  const { isLoading, loadingReason } = useRenderLoading();
-
-  // Show Render loading screen if app is loading due to Render spin-up
-  if (isLoading && loadingReason === 'render-spinup') {
-    return <RenderLoadingScreen />;
-  }
-
   return (
     <AuthProvider>
       <ReviewProvider>
@@ -52,7 +40,6 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/loading" element={<LoadingPage />} />
-          <Route path="/render-loading" element={<RenderLoadingScreen />} />
 
           {/* Home Page Route */}
           <Route path="/" element={
@@ -87,18 +74,18 @@ function App() {
             } 
           />
           <Route 
-            path="/learn/module/:moduleNumber/lesson/:title" 
-            element={
-              <ProtectedRoute>
-                <LessonEntryRedirectByTitle />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
             path="/learn/module/:moduleNumber/concept/:index" 
             element={
               <ProtectedRoute>
                 <ConceptPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/learn/module/:moduleNumber/lesson/:title" 
+            element={
+              <ProtectedRoute>
+                <LessonEntryRedirectByTitle />
               </ProtectedRoute>
             } 
           />
@@ -126,10 +113,6 @@ function App() {
               </ProtectedRoute>
             } 
           />
-          {/* Concept demo flow (public for now) */}
-          <Route path="/concept" element={<ConceptIntro />} />
-          <Route path="/concept/step2" element={<ConceptImages2 />} />
-          <Route path="/concept/quiz" element={<ConceptQuiz />} />
           <Route path="/lesson-complete" element={<LessonComplete />} />
           <Route path="/review-round" element={<ReviewRound />} />
           <Route path="/revision" element={<RevisionList />} />

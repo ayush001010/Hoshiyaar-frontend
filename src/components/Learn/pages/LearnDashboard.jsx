@@ -57,6 +57,8 @@ const LearnDashboard = ({ onboardingData }) => {
   const [chaptersList, setChaptersList] = useState([]);
   const [moduleTitle, setModuleTitle] = useState('');
   const [modulesList, setModulesList] = useState([]); // fetched modules for this chapter
+  const [unitTitle, setUnitTitle] = useState('');
+  const [unitsList, setUnitsList] = useState([]);
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [showChapters, setShowChapters] = useState(false);
   const [chapterStats, setChapterStats] = useState({}); // { [chapterId]: { total, completed } }
@@ -95,10 +97,36 @@ const LearnDashboard = ({ onboardingData }) => {
         if (ch) {
           setChapterTitle(ch.title);
           setChapterId(ch._id);
-          const modules = await cur.listModules(ch._id);
-          const list = modules?.data || [];
-          setModulesList(list);
-          if (list[0]) setModuleTitle(list[0].title);
+          // Resolve unit title (prefer last opened unit for this chapter)
+          try {
+            const unitsResp = await cur.listUnits(ch._id);
+            const units = unitsResp?.data || [];
+            setUnitsList(units);
+            let lastMap = {};
+            try { lastMap = JSON.parse(localStorage.getItem('last_unit_by_chapter') || '{}'); } catch (_) { lastMap = {}; }
+            const preferredUnitId = (new URLSearchParams(window.location.search)).get('unitId') || lastMap?.[ch._id];
+            const preferredUnit = units.find(u => u?._id === preferredUnitId);
+            const chosenUnit = preferredUnit || units[0];
+            if (chosenUnit?.title) setUnitTitle(chosenUnit.title);
+            // Load modules for chosen unit if available; otherwise fallback to chapter modules
+            if (chosenUnit?._id) {
+              const modsByUnit = await cur.listModulesByUnit(chosenUnit._id);
+              const list = modsByUnit?.data || [];
+              setModulesList(list);
+              if (list[0]) setModuleTitle(list[0].title);
+            } else {
+              const modules = await cur.listModules(ch._id);
+              const list = modules?.data || [];
+              setModulesList(list);
+              if (list[0]) setModuleTitle(list[0].title);
+            }
+          } catch (_) {
+            setUnitTitle('');
+            const modules = await cur.listModules(ch._id);
+            const list = modules?.data || [];
+            setModulesList(list);
+            if (list[0]) setModuleTitle(list[0].title);
+          }
         }
       } catch (e) {}
     };
@@ -177,6 +205,7 @@ const LearnDashboard = ({ onboardingData }) => {
   const rowSpacing = 160; // px per row (approx based on gap and node size)
   const centerTopOffset = 80; // equals top-20
   const listHeight = nodesCount * rowSpacing;
+  const lineHeight = Math.max(200, (levels.length * rowSpacing) - 120);
 
   return (
     <ReviewProvider>
@@ -187,13 +216,10 @@ const LearnDashboard = ({ onboardingData }) => {
         <a href="#" className={`flex items-center gap-4 py-3 px-4 rounded-xl text-lg font-bold transition-colors bg-blue-500 text-white shadow-md`}><LearnIcon /><span>Learn</span></a>
         <a href="#" onClick={(e) => { e.preventDefault(); navigate('/revision'); }} className={`flex items-center gap-4 py-3 px-4 rounded-xl text-lg font-bold transition-colors text-gray-600 hover:bg-blue-50`}><ReviseIcon /><span>Revision</span></a>
         <a href="#" onClick={(e) => { e.preventDefault(); navigate('/profile'); }} className={`flex items-center gap-4 py-3 px-4 rounded-xl text-lg font-bold transition-colors text-gray-600 hover:bg-blue-50`}><ProfileIcon /><span>Profile</span></a>
-        {/* Logout pinned to bottom on desktop */}
-        <div className="hidden md:block mt-auto pt-4">
-          <button onClick={handleLogout} className="w-full py-3 px-4 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition-colors">Logout</button>
-        </div>
+        {/* Logout removed from dashboard */}
             </nav>
 
-      <main className="flex-grow p-3 md:p-6 overflow-hidden bg-transparent">
+      <main className="flex-grow p-3 md:p-6 overflow-auto no-scrollbar bg-transparent">
 
         {/* Section Header (hide when viewing chapters list) */}
         {!showChapters && (
@@ -202,7 +228,7 @@ const LearnDashboard = ({ onboardingData }) => {
             <p className="font-extrabold text-2xl md:text-3xl">
               {subjectName}
             </p>
-            <p className="opacity-90 text-lg md:text-xl">{chapterTitle || 'Unit 1'}</p>
+          <p className="opacity-90 text-lg md:text-xl">{unitTitle || chapterTitle || 'Unit 1'}</p>
                         </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowChapters(true)} className="flex items-center gap-3 py-3 px-5 rounded-2xl bg-white/15 hover:bg-white/25 transition-colors ring-2 ring-white/40 text-lg">
@@ -214,7 +240,7 @@ const LearnDashboard = ({ onboardingData }) => {
         )}
                 
         {/* Vertical timeline */}
-        <div className={`${showChapters ? 'relative w-full' : 'relative max-w-4xl'} mx-auto h-[75vh] overflow-y-auto no-scrollbar`} style={{ minHeight: listHeight + centerTopOffset + 160 }}>
+        <div className={`${showChapters ? 'relative w-full' : 'relative max-w-4xl'} mx-auto h-[80vh] overflow-y-auto no-scrollbar`} style={{ minHeight: listHeight + centerTopOffset + 160 }}>
           {showChapters ? (
             <div className="w-full px-4 md:px-8">
               <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-3xl p-6 md:p-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] ring-4 ring-white/20 w-full">
@@ -259,7 +285,7 @@ const LearnDashboard = ({ onboardingData }) => {
           ) : (
             <>
               {/* Center line (dynamic height) */}
-              <div className="absolute left-1/2 -translate-x-1/2 w-3 bg-blue-300 rounded-full z-20 shadow-[0_0_0_6px_rgba(255,255,255,0.5)]" style={{ top: centerTopOffset, height: listHeight }} />
+              <div className="absolute left-1/2 -translate-x-1/2 w-3 bg-blue-300 rounded-full z-20 shadow-[0_0_0_6px_rgba(255,255,255,0.5)]" style={{ top: centerTopOffset, height: lineHeight }} />
               <div className="relative flex flex-col items-center gap-24 pt-28 pb-8">
             {levels.map((mod, index) => {
               const p = progress.find(c => c.chapter === index + 1);
@@ -313,15 +339,16 @@ const LearnDashboard = ({ onboardingData }) => {
                       </div>
                     </div>
                   )}
-                  {/* Tooltip (hover only with smooth transition) */}
+                  {/* Tooltip (hover only with smooth transition) - placed below the star */}
                   <div
-                    className={`absolute ${alignRight ? 'left-[60%]' : 'right-[60%]'} top-1/2 -translate-y-1/2 bg-white border-4 border-blue-600 rounded-[24px] shadow-xl px-7 py-5 w-80 hidden md:block transition-all duration-300 ${
-                      hoveredIndex === index ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
+                    className={`absolute ${alignRight ? 'left-[62%]' : 'right-[62%]'} top-full mt-4 bg-white border-4 border-blue-600 rounded-[24px] shadow-xl px-7 py-5 w-80 hidden md:block transition-all duration-500 ease-out ${
+                      hoveredIndex === index ? 'opacity-100' : 'opacity-0 pointer-events-none'
                     }`}
+                    style={{ zIndex: 40 }}
                   >
-                    <div className="text-2xl font-extrabold text-blue-700">Subject: {subjectName}</div>
-                    <div className="text-xl text-blue-700/80">Lesson {index + 1} of {levels.length}</div>
-                    <div className="text-xl font-extrabold mt-1 text-blue-600">Module: {(modulesList[index]?.title) || moduleTitle || 'Module'}</div>
+                    <div className="text-2xl font-extrabold mt-1 text-blue-700">{(modulesList[index]?.title) || moduleTitle || '—'}</div>
+                    <div className="text-xl font-semibold text-blue-700/80">{unitTitle || '—'}</div>
+                    <div className="text-base font-medium text-blue-700/60">{chapterTitle || '—'}</div>
                   </div>
                 </div>
               );
@@ -335,11 +362,11 @@ const LearnDashboard = ({ onboardingData }) => {
                   {starAlignRight ? (
                     <div className="absolute left-1/2 top-1/2 -translate-y-1/2 w-1/2 flex items-center">
                       <div className="h-2 md:h-3 bg-blue-300/60 rounded-full" style={{ width: `calc(50% - 90px)` }}></div>
-                      <RevisionStar align="right" chapterId={chapterId} />
+                      <RevisionStar align="right" chapterId={chapterId} unitId={unitsList?.[0]?._id} />
                     </div>
                   ) : (
                     <div className="absolute right-1/2 top-1/2 -translate-y-1/2 w-1/2 flex items-center justify-end">
-                      <RevisionStar align="left" chapterId={chapterId} />
+                      <RevisionStar align="left" chapterId={chapterId} unitId={unitsList?.[0]?._id} />
                       <div className="h-2 md:h-3 bg-blue-300/60 rounded-full" style={{ width: `calc(50% - 90px)` }}></div>
                     </div>
                   )}

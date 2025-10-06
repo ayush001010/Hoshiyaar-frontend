@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import ConceptLayout from './ConceptLayout.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
@@ -15,6 +15,16 @@ const ConceptQuiz = ({ question = "Which is blood in it's correct form", onConti
   const [selected, setSelected] = useState('Image');
   const [validated, setValidated] = useState(false);
   const { user } = useAuth();
+
+  // Enter to continue
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Enter') return;
+      handleContinue();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [validated]);
 
   const handleContinue = () => {
     if (!validated) {

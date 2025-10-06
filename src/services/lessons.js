@@ -1,9 +1,12 @@
 const API_BASE = import.meta?.env?.VITE_API_BASE || '';
 
-export async function fetchLessonItemsByModule(moduleNumber) {
-  const response = await fetch(`${API_BASE}/api/lessons/${moduleNumber}`);
+// Fetch items for a module by its ObjectId (from curriculum flow)
+export async function fetchLessonItemsByModule(moduleId) {
+  const url = `${API_BASE}/api/curriculum/items?moduleId=${encodeURIComponent(moduleId)}`;
+  const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to load lessons for module ${moduleNumber}`);
+    const text = await response.text();
+    throw new Error(text || `Failed to load items for module ${moduleId}`);
   }
   return response.json();
 }

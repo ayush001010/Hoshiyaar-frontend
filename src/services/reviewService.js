@@ -1,11 +1,21 @@
 import axios from 'axios';
 
-// Use proxy for local development
-const API = import.meta.env.VITE_API_BASE || '';
+// Prefer Vite proxy on localhost; use VITE_API_BASE only in non-local envs
+const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)/.test(window.location.hostname);
+const API = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || '');
 
 const reviewService = {
   async listIncorrect(userId, moduleId, chapterId) {
     const res = await axios.get(`${API}/api/review/incorrect`, { params: { userId, moduleId, chapterId } });
+    return res.data || [];
+  },
+  async listDefaults({ moduleId, unitId, chapterId, subjectId } = {}) {
+    const params = {};
+    if (moduleId) params.moduleId = moduleId;
+    else if (unitId) params.unitId = unitId;
+    else if (chapterId) params.chapterId = chapterId;
+    else if (subjectId) params.subjectId = subjectId;
+    const res = await axios.get(`${API}/api/review/defaults`, { params });
     return res.data || [];
   },
   async saveIncorrect({ userId, questionId, moduleId, chapterId }) {

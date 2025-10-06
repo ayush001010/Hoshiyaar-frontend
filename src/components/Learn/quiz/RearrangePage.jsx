@@ -115,16 +115,23 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
     setAvailableWords(shuffled);
   }, [item, moduleNumber, index]);
 
-  // Block browser back
+  // Allow browser back
+  useEffect(() => {}, []);
+
+  // Enter to submit/continue
   useEffect(() => {
-    const handlePop = () => {
-      setShowExitConfirm(true);
-      try { window.history.pushState(null, '', window.location.href); } catch (_) {}
+    const onKey = (e) => {
+      if (e.key !== 'Enter') return;
+      if (!item) return;
+      if (!showResult) {
+        handleCheck();
+      } else {
+        goNext();
+      }
     };
-    try { window.history.pushState(null, '', window.location.href); } catch (_) {}
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
-  }, []);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [item, showResult, arrangedWords]);
 
   function routeForType(type, idx) {
     switch (type) {
@@ -219,10 +226,15 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
 
   const handleSubmit = async () => {
     if (showResult) return;
-    
-    const userAnswer = arrangedWords.join(' ').trim().toLowerCase();
+    // Normalize answers to avoid punctuation/extra-space mismatches
+    const normalize = (s) => String(s || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ') // drop punctuation
+      .replace(/\s+/g, ' ') // collapse spaces
+      .trim();
+    const userAnswer = normalize(arrangedWords.join(' '));
     const correctAnswer = Array.isArray(item.answer) ? item.answer[0] : item.answer;
-    const correct = String(correctAnswer || '').trim().toLowerCase() === userAnswer;
+    const correct = normalize(correctAnswer) === userAnswer;
     
     setIsCorrect(correct);
     setShowResult(true);
@@ -366,10 +378,28 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       {/* Main Content - left image, right question + arranged area, word bank below */}
       <div className="flex-1 w-full px-6 max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start mt-6">
-          {/* Image (Left) */}
-          <div className="w-full h-64 rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center">
-            <span className="text-gray-400">Image</span>
-          </div>
+          {/* Image (Left) - render uploaded images if available */}
+          {(() => {
+            const imgs = (item.images || []).filter(Boolean);
+            const primary = item.imageUrl ? [item.imageUrl] : [];
+            const list = imgs.length > 0 ? imgs : primary;
+            if (list.length === 0) {
+              return (
+                <div className="w-full h-64 rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center">
+                  <span className="text-gray-400">Image</span>
+                </div>
+              );
+            }
+            return (
+              <div className="w-full rounded-3xl border-2 border-gray-200 bg-white flex items-center justify-center p-3">
+                <div className="flex flex-wrap justify-center gap-4">
+                  {list.slice(0, 5).map((src, i) => (
+                    <img key={i} src={src} alt={`rearrange-${i}`} className="h-56 w-44 object-contain rounded-xl border" />
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Question + Arranged (Right) */}
           <div className="flex flex-col">
@@ -419,42 +449,42 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
                 </button>
               )}
             </div>
+
+            {/* Word bank and Check button on the right column */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-8">
+              {availableWords.length > 0 ? (
+                availableWords.map((word, idx) => (
+                  <button
+                    key={`available-${word}-${idx}`}
+                    onClick={() => handleWordClick(word, 'available', idx)}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, word, 'available', idx)}
+                    disabled={showResult}
+                    className={`p-3 rounded-xl border-2 font-semibold transition-all ${
+                      showResult
+                        ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-white border-gray-300 text-gray-700 hover:border-blue-400 hover:scale-105 cursor-move'
+                    }`}
+                  >
+                    {word}
+                  </button>
+                ))
+              ) : (
+                <div className="col-span-full text-center text-gray-500 py-6">No words available.</div>
+              )}
+            </div>
+
+            <div className="w-full max-w-md mt-6 self-start">
+              {!showResult && (
+                <button
+                  onClick={handleSubmit}
+                  className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-lg"
+                >
+                  Check
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 mt-10">
-          {availableWords.length > 0 ? (
-            availableWords.map((word, idx) => (
-              <button
-                key={`available-${word}-${idx}`}
-                onClick={() => handleWordClick(word, 'available', idx)}
-                draggable
-                onDragStart={(e) => handleDragStart(e, word, 'available', idx)}
-                disabled={showResult}
-                className={`p-3 rounded-xl border-2 font-semibold transition-all ${
-                  showResult
-                    ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-white border-gray-300 text-gray-700 hover:border-blue-400 hover:scale-105 cursor-move'
-                }`}
-              >
-                {word}
-              </button>
-            ))
-          ) : (
-            <div className="col-span-full text-center text-gray-500 py-8">No words available for this question.</div>
-          )}
-        </div>
-
-        {/* Bottom Check Button (no in-page Continue) */}
-        <div className="w-full max-w-3xl mx-auto mt-8 mb-8">
-          {!showResult && (
-            <button
-              onClick={handleSubmit}
-              className="w-full py-5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xl"
-            >
-              Check
-            </button>
-          )}
         </div>
       </div>
 

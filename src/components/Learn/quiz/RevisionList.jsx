@@ -10,7 +10,9 @@ export default function RevisionList() {
   const [params] = useSearchParams();
   const moduleId = params.get('moduleId') || '';
   const chapterId = params.get('chapterId') || '';
+  const unitId = params.get('unitId') || '';
   const moduleTitleParam = params.get('moduleTitle') || '';
+  const defaultOnly = params.get('defaultOnly') === 'true';
   const { user } = useAuth();
   const { reset, add } = useReview();
   const [items, setItems] = useState([]);
@@ -19,6 +21,12 @@ export default function RevisionList() {
   const [chapterName, setChapterName] = useState('');
   const [moduleName, setModuleName] = useState(moduleTitleParam);
   const [chapters, setChapters] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [unitName, setUnitName] = useState('');
+  const [defaultEntries, setDefaultEntries] = useState([]);
+  const [incorrectCountByModule, setIncorrectCountByModule] = useState({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const EyeIcon = ({ className = 'w-5 h-5' }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -49,17 +57,57 @@ export default function RevisionList() {
           return;
         }
       }
-      // If chapter view, we need to know module IDs in this chapter and filter incorrect items by those
-      if (!moduleId && chapterId) {
+      // If chapter view without unit chosen, list units (and fallback to modules if none)
+      if (!moduleId && chapterId && !unitId) {
         try {
-          const mods = await curriculumService.listModules(chapterId);
-          const modArr = mods?.data || [];
-          setModules(modArr);
-          // Try to fetch chapter name (using same approach as dashboard)
+          // Chapter title
           try {
             const chs = await curriculumService.listChapters('CBSE', user?.subject || 'Science');
             const chObj = (chs?.data || []).find(c => c._id === chapterId);
             if (chObj?.title) setChapterName(chObj.title);
+          } catch (_) {}
+          const un = await curriculumService.listUnits(chapterId);
+          const arr = un?.data || [];
+          setUnits(arr);
+          // Fallback: if there are no units, load modules directly by chapter so user can continue
+          if (!arr || arr.length === 0) {
+        try {
+          const mods = await curriculumService.listModules(chapterId);
+              setModules(mods?.data || []);
+            } catch (_) {
+              setModules([]);
+            }
+          }
+        } catch (_) {
+          setUnits([]);
+        }
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+      // If unit view, list modules in this unit and filter incorrect items by those
+      if (!moduleId && unitId) {
+        try {
+          const mods = await curriculumService.listModulesByUnit(unitId);
+          const modArr = mods?.data || [];
+          setModules(modArr);
+          // Try to fetch chapter name
+          try {
+            const chs = await curriculumService.listChapters('CBSE', user?.subject || 'Science');
+            const chObj = (chs?.data || []).find(c => c._id === chapterId);
+            if (chObj?.title) setChapterName(chObj.title);
+          } catch (_) {}
+          // Try to fetch unit name
+          try {
+            const un = await curriculumService.listUnits(chapterId);
+            const uObj = (un?.data || []).find(u => u._id === unitId);
+            if (uObj?.title) setUnitName(uObj.title);
+            // Persist last opened unit for this chapter
+            try {
+              const map = JSON.parse(localStorage.getItem('last_unit_by_chapter') || '{}');
+              map[chapterId] = unitId;
+              localStorage.setItem('last_unit_by_chapter', JSON.stringify(map));
+            } catch (_) {}
           } catch (_) {}
           const allIncorrect = await reviewService.listIncorrect(user._id);
           const allowed = new Set(modArr.map(m => m._id));
@@ -70,23 +118,111 @@ export default function RevisionList() {
             }
             return it;
           }).filter(it => allowed.has(it.moduleId));
+          // Build incorrect counts
+          try {
+            const counts = {};
+            for (const it of list) {
+              const mid = String(it.moduleId);
+              counts[mid] = (counts[mid] || 0) + 1;
+            }
+            setIncorrectCountByModule(counts);
+          } catch (_) { setIncorrectCountByModule({}); }
+          // Fetch default revision items for this unit (keep separate for special box)
+          try {
+            const defaults = await reviewService.listDefaults({ unitId });
+            setDefaultEntries((defaults || []).filter(d => !d.moduleId || allowed.has(d.moduleId)));
+          } catch (_) { setDefaultEntries([]); }
         } catch (_) { list = []; }
       } else {
         list = await reviewService.listIncorrect(user._id, moduleId || undefined, chapterId || undefined);
+        // When specific module view, also fetch defaults for that module
+        if (moduleId) {
+          try {
+            const defaults = await reviewService.listDefaults({ moduleId });
+            const makeId = (d, idx) => `${String(moduleId)}_${String(idx + 1)}_${String(d.type || 'statement')}`;
+            const defaultsAsItems = (defaults || []).map((d, idx) => ({
+              questionId: makeId(d, idx),
+              moduleId: String(moduleId),
+              label: d.question || d.text || `Default ${idx + 1}`,
+              count: 0,
+              lastSeenAt: null,
+              _source: 'default'
+            }));
+            const seen = new Set(list.map(i => i.questionId));
+            const merged = [...defaultsAsItems.filter(i => !seen.has(i.questionId)), ...list];
+            list = merged;
+          } catch (_) {}
+        }
       }
+      // If defaultOnly view at unit level, map defaults to items list (questionId resolvable)
+      if (defaultOnly && unitId) {
+        try {
+          const mapped = [];
+          const byModule = new Map();
+          for (const d of defaultEntries) {
+            const mid = String(d.moduleId || '');
+            if (!mid) continue;
+            if (!byModule.has(mid)) {
+              const res = await curriculumService.listItems(mid);
+              byModule.set(mid, res?.data || []);
+            }
+            const arr = byModule.get(mid);
+            const idx = arr.findIndex(x => {
+              const t = String(d.type || '').toLowerCase();
+              if (t === 'multiple-choice') return (x.type === 'multiple-choice') && (String(x.question||'').trim().toLowerCase() === String(d.question||'').trim().toLowerCase());
+              if (t === 'fill-in-the-blank') return (x.type === 'fill-in-the-blank') && (String(x.question||'').trim().toLowerCase() === String(d.question||'').trim().toLowerCase());
+              if (t === 'rearrange') return (x.type === 'rearrange') && (String(x.question||'').trim().toLowerCase() === String(d.question||'').trim().toLowerCase());
+              return (x.type === 'statement') && (String(x.text||'').trim().toLowerCase() === String(d.text||'').trim().toLowerCase());
+            });
+            if (idx >= 0) {
+              mapped.push({
+                questionId: `${mid}_${idx}_` + (d.type || 'statement'),
+                moduleId: mid,
+                label: d.question || d.text || `Default`,
+                count: 0,
+                lastSeenAt: null,
+                _source: 'default'
+              });
+            }
+          }
+          // Dedupe by questionId to avoid repeated queue items
+          const uniq = [];
+          const seen = new Set();
+          for (const it of mapped) {
+            if (it?.questionId && !seen.has(it.questionId)) {
+              seen.add(it.questionId);
+              uniq.push(it);
+            }
+          }
+          setItems(uniq);
+        } catch (_) {
+          setItems([]);
+        }
+      } else {
       setItems(list);
+      }
       // If a module is specified, fetch its items to show titles/questions
       if (moduleId) {
         try {
           const res = await curriculumService.listItems(moduleId);
           const arr = res?.data || [];
-          // attach label
-          setItems(list.map(it => {
+          // Validate and attach label: keep only items that exist in module and type matches
+          const sanitized = list.filter(it => {
+            const parts = String(it.questionId).split('_');
+            if (parts.length < 3) return false;
+            const idx = Number(parts[1]);
+            const type = String(parts[2]);
+            if (!(idx >= 0 && idx < arr.length)) return false;
+            const t = String(arr[idx]?.type || '');
+            return t === type || (t === 'statement' && (type === '' || type === 'statement'));
+          }).map(it => {
             const [mod, idx] = String(it.questionId).split('_');
             const item = arr[Number(idx)] || {};
-            const label = item.title || item.question || item.statement || `Question ${idx}`;
-            return { ...it, label };
-          }));
+            const t = String(item.type || '');
+            const label = (t === 'statement' ? (item.text || item.statement) : (item.question || item.title || item.statement)) || '';
+            return { ...it, label: label };
+          });
+          setItems(sanitized);
           const posibleName = arr[0]?.moduleTitle || arr[0]?.module || arr.moduleTitle;
           if (posibleName && !moduleTitleParam) setModuleName(posibleName);
         } catch (_) {}
@@ -117,18 +253,81 @@ export default function RevisionList() {
       setLoading(false);
     };
     load();
-  }, [user, moduleId, chapterId]);
+  }, [user, moduleId, chapterId, unitId, defaultOnly]);
 
   const startReview = () => {
+    // Build queue synchronously and then navigate with a brief tick to let context update
     reset();
-    items.forEach(({ questionId }) => {
+    const unique = [];
+    const seen = new Set();
+    for (const it of items) {
+      if (!it?.questionId) continue;
+      if (seen.has(it.questionId)) continue;
+      seen.add(it.questionId);
+      unique.push(it);
+    }
+    unique.forEach(({ questionId }) => {
       const [mod, idx, type] = String(questionId).split('_');
       add({ questionId, moduleNumber: mod, index: idx, type: type || 'multiple-choice' });
     });
-    if (items.length > 0) navigate('/review-round');
+    if (unique.length > 0) {
+      const [mod, idx, type] = String(unique[0].questionId).split('_');
+      let path = `/learn/module/${mod}`;
+      if (type === 'multiple-choice') path += `/mcq/${idx}`;
+      else if (type === 'fill-in-the-blank') path += `/fillups/${idx}`;
+      else if (type === 'rearrange') path += `/rearrange/${idx}`;
+      else path += `/concept/${idx}`;
+      // Use /review-round as a fallback if direct navigation fails; try both sequentially
+      setTimeout(() => {
+        try { navigate(`${path}?review=true`); } catch (_) { navigate('/review-round'); }
+      }, 0);
+    }
   };
 
   const subjectName = user?.subject || 'Science';
+  const paginate = (arr) => {
+    const start = (page - 1) * pageSize;
+    return arr.slice(start, start + pageSize);
+  };
+  const Pagination = ({ total }) => {
+    const totalPages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
+    const go = (n) => setPage(Math.min(totalPages, Math.max(1, n)));
+    return (
+      <div className="mt-8 flex items-center justify-between">
+        {/* Page size */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-extrabold text-blue-700">Per page</span>
+          <select
+            value={pageSize}
+            onChange={(e)=>{ setPageSize(Number(e.target.value)||10); setPage(1); }}
+            className="px-3 py-2 text-sm font-bold rounded-2xl bg-white border-2 border-blue-200 text-blue-700 hover:border-blue-300 shadow-[0_6px_0_0_rgba(0,0,0,0.06)]"
+          >
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+          </select>
+        </div>
+        {/* Simple playful pager */}
+        <div className="flex items-center gap-4">
+          <button
+            disabled={page<=1}
+            onClick={()=>go(page-1)}
+            className={`px-5 py-2 rounded-2xl font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.06)] transition ${page<=1? 'bg-gray-100 text-gray-400' : 'bg-blue-500 text-white hover:brightness-110'}`}
+          >
+            ⬅ Prev
+          </button>
+          <span className="px-4 py-2 rounded-full bg-yellow-300 text-yellow-900 font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.06)]">Page {page} of {totalPages}</span>
+          <button
+            disabled={page>=totalPages}
+            onClick={()=>go(page+1)}
+            className={`px-5 py-2 rounded-2xl font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.06)] transition ${page>=totalPages? 'bg-gray-100 text-gray-400' : 'bg-green-500 text-white hover:brightness-110'}`}
+          >
+            Next ➡
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#E8F2FF] to-white py-10 px-6 relative">
@@ -136,9 +335,9 @@ export default function RevisionList() {
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-extrabold text-blue-700 tracking-wide">Let’s Fix What We Missed!</h1>
-          <p className="mt-4 text-lg md:text-xl text-blue-900/80">{!chapterId && !moduleId ? 'Subject' : (moduleId ? 'Module' : 'Chapter')}:
+          <p className="mt-4 text-lg md:text-xl text-blue-900/80">{(!chapterId && !moduleId) ? 'Subject' : (moduleId ? 'Module' : (unitId ? 'Unit' : 'Chapter'))}:
             <span className="ml-2 px-3 py-1 rounded-2xl bg-blue-100 text-blue-800 font-bold">
-              {!chapterId && !moduleId ? subjectName : (moduleId ? (moduleName || 'Loading…') : (chapterName || chapterId || 'All'))}
+              {!chapterId && !moduleId ? subjectName : (moduleId ? (moduleName || 'Loading…') : (unitId ? (unitName || 'Loading…') : (chapterName || 'Loading…')))}
             </span>
           </p>
         </div>
@@ -164,9 +363,73 @@ export default function RevisionList() {
             </ul>
           );
         })()
-      ) : !moduleId && chapterId ? (
-        // Chapter-level index: show modules that have incorrect questions
+      ) : (!moduleId && chapterId && !unitId) ? (
+        // Chapter-level index: show units; if none, show modules directly (fallback)
         (() => {
+          if ((units || []).length === 0) {
+            if ((modules || []).length === 0) return <div>No units found.</div>;
+            // Fallback modules listing by chapter
+            return (
+              <ul className="space-y-6">
+                {modules.map((m) => (
+                  <li key={m._id} className="w-full p-6 rounded-3xl border-4 border-green-300 bg-white shadow-[0_10px_0_0_rgba(34,197,94,0.18)] flex items-center justify-between">
+                    <div className="pr-4">
+                      <div className="text-2xl font-extrabold text-green-700">{m.title || 'Module'}</div>
+                      <div className="text-sm text-green-900/70 mt-1">Module</div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span className="px-3 py-1 rounded-full bg-green-100 text-green-800 font-bold text-sm inline-flex items-center gap-2">Items {incorrectCountByModule[m._id] || 0}</span>
+                      <button onClick={() => navigate(`/revision?moduleId=${encodeURIComponent(m._id)}&moduleTitle=${encodeURIComponent(m.title || 'Module')}`)} className="px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white text-base font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.15)]">Open</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            );
+          }
+          return (
+            <ul className="space-y-6">
+              {units.map((u) => (
+                <li key={u._id} className="w-full p-6 rounded-3xl border-4 border-purple-300 bg-white shadow-[0_10px_0_0_rgba(147,51,234,0.18)] flex items-center justify-between">
+                  <div className="pr-4">
+                    <div className="text-2xl font-extrabold text-purple-700">{u.title}</div>
+                    <div className="text-sm text-purple-900/70 mt-1">Unit</div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => navigate(`/revision?chapterId=${encodeURIComponent(chapterId)}&unitId=${encodeURIComponent(u._id)}`)} className="px-5 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white text-base font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.15)]">Open</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          );
+        })()
+      ) : (!moduleId && unitId && defaultOnly) ? (
+        // Default-only unit-level list
+        (() => {
+          if ((items || []).length === 0) return <div>No default items found for this unit.</div>;
+          return (
+            <>
+              <div className="text-left mb-4">
+                <button onClick={startReview} className="inline-block px-6 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white text-base font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.15)]">Start Super Important Revision</button>
+              </div>
+              <ul className="space-y-4 mb-10">
+                {paginate(items).map((it, i) => (
+                  <li key={i} className="p-6 rounded-3xl bg-white border-4 border-purple-300 shadow-[0_10px_0_0_rgba(147,51,234,0.18)] flex items-center justify-between">
+                    <div className="flex flex-col pr-4">
+                      <span className="text-xl font-extrabold text-purple-800">{it.label || it.questionId}</span>
+                      <span className="text-xs text-gray-500">Default revision</span>
+                    </div>
+                    <span className="text-sm text-gray-700 inline-flex items-center gap-2">Recommended</span>
+                  </li>
+                ))}
+              </ul>
+              <Pagination total={items.length} />
+            </>
+          );
+        })()
+      ) : (!moduleId && unitId) ? (
+        // Unit-level index: show all modules in the unit, enriched with incorrect stats if present
+        (() => {
+          const defaultsCount = (defaultEntries || []).length;
           const stats = items.reduce((acc, it) => {
             if (!it.moduleId) return acc;
             const id = it.moduleId;
@@ -176,32 +439,49 @@ export default function RevisionList() {
             if (t > acc[id].last) acc[id].last = t;
             return acc;
           }, {});
-          const list = Object.entries(stats);
-          if (list.length === 0) return <div>No items to review.</div>;
-          const titleFor = (id) => (modules.find(m => m._id === id)?.title) || id;
+          const list = (modules || []).map(m => ({ id: m._id, title: m.title || 'Module', stat: stats[m._id] || { count: 0, last: 0 } }));
+          if (list.length === 0) return <div>No modules found.</div>;
           return (
+            <>
+              {/* Super Important box */}
+              <div className="w-full p-6 rounded-3xl border-4 border-purple-300 bg-white shadow-[0_10px_0_0_rgba(147,51,234,0.18)] flex items-center justify-between mb-6">
+                <div className="pr-4">
+                  <div className="text-2xl font-extrabold text-purple-700">Super Important Revision Questions</div>
+                  <div className="text-sm text-purple-900/70 mt-1">{defaultsCount} recommended items</div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => navigate(`/revision?chapterId=${encodeURIComponent(chapterId)}&unitId=${encodeURIComponent(unitId)}&defaultOnly=true`)} className="px-5 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white text-base font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.15)]">Open</button>
+                </div>
+              </div>
             <ul className="space-y-6">
-              {list.map(([id, stat]) => (
+              {paginate(list).map(({ id, title, stat }) => (
                 <li key={id} className="w-full p-6 rounded-3xl border-4 border-green-300 bg-white shadow-[0_10px_0_0_rgba(34,197,94,0.18)] flex items-center justify-between">
                   <div className="pr-4">
-                    <div className="text-2xl font-extrabold text-green-700">{titleFor(id)}</div>
+                    <div className="text-2xl font-extrabold text-green-700">{title}</div>
                     <div className="text-sm text-green-900/70 mt-1">Last attempt: {stat.last ? new Date(stat.last).toLocaleString() : '—'}</div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="px-3 py-1 rounded-full bg-green-100 text-green-800 font-bold text-sm inline-flex items-center gap-2">Attempted {stat.count}</span>
-                    <button onClick={() => navigate(`/revision?moduleId=${encodeURIComponent(id)}&moduleTitle=${encodeURIComponent(titleFor(id))}`)} className="px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white text-base font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.15)]">Open</button>
+                    <span className="px-3 py-1 rounded-full bg-green-100 text-green-800 font-bold text-sm inline-flex items-center gap-2">Items {incorrectCountByModule[id] || 0}</span>
+                    <button onClick={() => navigate(`/revision?moduleId=${encodeURIComponent(id)}&moduleTitle=${encodeURIComponent(title)}`)} className="px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white text-base font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.15)]">Open</button>
                   </div>
                 </li>
               ))}
             </ul>
+            <Pagination total={list.length} />
+            </>
           );
         })()
       ) : items.length === 0 ? (
         <div>No items to review.</div>
       ) : (
         <>
+          {moduleId && (
+            <div className="text-left mb-4">
+              <button onClick={startReview} className="inline-block px-6 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white text-base font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.15)]">Start Re-attempt</button>
+            </div>
+          )}
           <ul className="space-y-4 mb-10">
-            {items.map((it, i) => (
+            {paginate(items).map((it, i) => (
               <li key={i} className="p-6 rounded-3xl bg-white border-4 border-blue-300 shadow-[0_10px_0_0_rgba(59,130,246,0.22)] flex items-center justify-between">
                 <div className="flex flex-col pr-4">
                   <span className="text-xl font-extrabold text-blue-800">{it.label || it.questionId}</span>
@@ -211,9 +491,7 @@ export default function RevisionList() {
               </li>
             ))}
           </ul>
-          <div className="text-center">
-            <button onClick={startReview} className="px-10 py-4 rounded-3xl bg-green-600 hover:bg-green-700 text-white text-2xl font-extrabold shadow-[0_10px_0_0_rgba(0,0,0,0.15)]">Start Re-attempt</button>
-          </div>
+          <Pagination total={items.length} />
         </>
       )}
       </div>

@@ -71,16 +71,26 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
     setShowTryAgainOption(false);
   }, [item, moduleNumber, index]);
 
-  // Block browser back navigation within a module and show exit confirm
+  // Allow native browser back (no intercept)
+  useEffect(() => {}, []);
+
+  // Enter to continue/submit
   useEffect(() => {
-    const handlePop = () => {
-      setShowExitConfirm(true);
-      try { window.history.pushState(null, '', window.location.href); } catch (_) {}
+    const onKey = (e) => {
+      if (e.key !== 'Enter') return;
+      if (!item) return;
+      if (!showResult) {
+        // if nothing selected, select first option
+        const idx = selectedIndex == null ? 0 : selectedIndex;
+        handleOptionClick(idx);
+      } else {
+        // after result, go next
+        goNext();
+      }
     };
-    try { window.history.pushState(null, '', window.location.href); } catch (_) {}
-    window.addEventListener('popstate', handlePop);
-    return () => window.removeEventListener('popstate', handlePop);
-  }, []);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [item, showResult, selectedIndex]);
 
   function routeForType(type, idx) {
     switch (type) {
