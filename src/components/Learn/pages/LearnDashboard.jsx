@@ -225,10 +225,20 @@ const LearnDashboard = ({ onboardingData }) => {
         {!showChapters && (
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-5 rounded-3xl flex justify-between items-center mb-6 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] max-w-3xl mx-auto">
                         <div>
-            <p className="font-extrabold text-2xl md:text-3xl">
+            {/* Unit on top */}
+            <p className="font-extrabold text-xl md:text-2xl">
+              {unitTitle || 'Unit 1'}
+            </p>
+            {/* Chapter in the middle */}
+            {chapterTitle && (
+              <p className="opacity-95 text-base md:text-lg">
+                {chapterTitle}
+              </p>
+            )}
+            {/* Subject at bottom */}
+            <p className="opacity-90 text-sm md:text-base">
               {subjectName}
             </p>
-          <p className="opacity-90 text-lg md:text-xl">{unitTitle || chapterTitle || 'Unit 1'}</p>
                         </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowChapters(true)} className="flex items-center gap-3 py-3 px-5 rounded-2xl bg-white/15 hover:bg-white/25 transition-colors ring-2 ring-white/40 text-lg">
