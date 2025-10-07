@@ -122,10 +122,13 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Enter') return;
+      console.log('[REARRANGE] Enter pressed', { showResult, arrangedWordsLen: arrangedWords.length });
       if (!item) return;
       if (!showResult) {
+        console.log('[REARRANGE] Submitting via Enter');
         handleCheck();
       } else {
+        console.log('[REARRANGE] Continuing via Enter');
         goNext();
       }
     };
@@ -277,6 +280,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
   };
 
   async function handleNext(force = false) {
+    console.log('[REARRANGE] handleNext called', { force, hasAnsweredCorrectly, isCorrect });
     if (!force && !hasAnsweredCorrectly && !isCorrect) {
       return;
     }

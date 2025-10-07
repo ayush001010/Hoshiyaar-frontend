@@ -68,8 +68,15 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Enter') return;
+      console.log('[FILLUPS] Enter pressed', { showResult, userAnswer });
       if (!item) return;
-      if (!showResult) handleSubmit(); else goNext();
+      if (!showResult) {
+        console.log('[FILLUPS] Submitting via Enter');
+        handleSubmit();
+      } else {
+        console.log('[FILLUPS] Continuing via Enter');
+        handleNext();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -140,6 +147,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
   };
 
   async function handleNext(force = false) {
+    console.log('[FILLUPS] handleNext called', { force, hasAnsweredCorrectly, isCorrect });
     // Allow forced advance from incorrect modal
     if (!force && !hasAnsweredCorrectly && !isCorrect) {
       return;
@@ -173,6 +181,9 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
     }
     navigate(`${routeForType(nextItem.type, nextIndex)}${suffix}`);
   }
+
+  // Backward-compat alias in case any stale listeners call goNext
+  const goNext = (force = false) => handleNext(force);
 
   const handleFeedbackClose = () => {
     setFeedback({ open: false, correct: false, expected: '' });

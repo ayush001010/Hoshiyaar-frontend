@@ -7,6 +7,12 @@ export default function IncorrectAnswerModal({ isOpen, onClose, onContinue, onTr
     if (isOpen) {
       // Small delay to ensure smooth animation
       setTimeout(() => setIsVisible(true), 10);
+      const onKey = (e) => {
+        if (e.key !== 'Enter') return;
+        if (typeof onTryAgain === 'function') onTryAgain();
+      };
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
     } else {
       setIsVisible(false);
     }

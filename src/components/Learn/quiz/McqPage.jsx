@@ -78,13 +78,16 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Enter') return;
+      console.log('[MCQ] Enter pressed', { showResult, selectedIndex });
       if (!item) return;
       if (!showResult) {
         // if nothing selected, select first option
         const idx = selectedIndex == null ? 0 : selectedIndex;
+        console.log('[MCQ] Submitting option via Enter', idx);
         handleOptionClick(idx);
       } else {
         // after result, go next
+        console.log('[MCQ] Continuing via Enter');
         goNext();
       }
     };
@@ -160,6 +163,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
   }
 
   async function handleNext(force = false) {
+    console.log('[MCQ] handleNext called', { force, hasAnsweredCorrectly, isCorrect });
     // Allow forced advance (from incorrect modal). Otherwise require correct.
     if (!force && !hasAnsweredCorrectly && !isCorrect) {
       return;
