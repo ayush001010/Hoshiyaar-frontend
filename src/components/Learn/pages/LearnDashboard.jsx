@@ -243,7 +243,7 @@ const LearnDashboard = ({ onboardingData }) => {
           <div className="flex items-center gap-2">
             <button onClick={() => setShowChapters(true)} className="flex items-center gap-3 py-3 px-5 rounded-2xl bg-white/15 hover:bg-white/25 transition-colors ring-2 ring-white/40 text-lg">
               <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/20"><ChapterNavIcon /></span>
-                        <span className="font-bold hidden sm:inline">Other Chapters</span>
+                        <span className="font-bold hidden sm:inline">All Chapters</span>
                     </button>
           </div>
                 </div>
