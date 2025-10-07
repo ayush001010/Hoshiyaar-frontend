@@ -36,7 +36,7 @@ export default function UploadTest() {
   const handleUpload = async (e) => {
     e.preventDefault();
     setError('');
-    if (!file) return;
+    if (!file && files.length === 0) return;
     try {
       setLoading(true);
       const form = new FormData();
@@ -54,9 +54,15 @@ export default function UploadTest() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.message || 'Upload failed');
       if (data.images) {
+        const toDisplay = (data.images || []).map((img, idx) => ({
+          ...img,
+          name: (files[idx] && files[idx].name) || (() => {
+            try { return decodeURIComponent((img.url || '').split('/').pop() || ''); } catch { return (img.public_id || '').split('/').pop(); }
+          })()
+        }));
         setUrl('');
         setPublicId('');
-        setUploadedImages(data.images);
+        setUploadedImages(toDisplay);
         setToast({ open: true, type: 'success', text: `Uploaded ${data.images.length} images!`, hideAt: Date.now() + 2000 });
       } else {
         setUrl(data.secure_url || data.url);
@@ -242,7 +248,7 @@ export default function UploadTest() {
                 <div className="text-sm text-gray-700 truncate max-w-[60%]">{file?.name}</div>
               )}
               <button
-                onClick={() => setFile(null)}
+                onClick={() => { setFile(null); setFiles([]); }}
                 className="ml-auto text-sm text-red-600 hover:underline"
               >Remove</button>
             </div>
@@ -252,7 +258,7 @@ export default function UploadTest() {
 
           <button
             onClick={handleUpload}
-            disabled={!file || loading}
+            disabled={(!(file || files.length > 0)) || loading}
             className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 text-white font-extrabold text-base md:text-lg disabled:opacity-50 shadow-xl"
           >
             {loading ? 'Uploading...' : 'Upload'}
@@ -263,7 +269,32 @@ export default function UploadTest() {
           {(url || uploadedImages.length > 0) && (
             <div className="mt-6">
               {uploadedImages.length > 0 ? (
-                <div className="text-sm text-gray-700">{uploadedImages.length} images ready to save</div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm text-gray-700 font-semibold">{uploadedImages.length} images ready to save</div>
+                    <button
+                      onClick={() => { try { navigator.clipboard.writeText(uploadedImages.map(i=>i.url).join('\n')); setToast({ open: true, type: 'success', text: 'Copied all links', hideAt: Date.now() + 1200 }); } catch (_) {} }}
+                      className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold"
+                    >Copy all</button>
+                  </div>
+                  <div className="space-y-2 max-h-64 overflow-auto pr-1">
+                    {uploadedImages.map((img, idx) => (
+                      <div key={img.public_id || idx} className="flex items-center gap-3">
+                        <div className="text-[10px] font-bold text-gray-500 w-14 shrink-0">#{idx+1}</div>
+                        <div className="hidden md:block text-[10px] text-gray-700 truncate max-w-[30%]" title={img.name || ''}>{img.name || ''}</div>
+                        <input
+                          value={img.url}
+                          readOnly
+                          className="w-full rounded-xl border px-3 h-9 bg-white text-[11px] text-gray-700"
+                        />
+                        <button
+                          onClick={() => { try { navigator.clipboard.writeText(img.url || ''); setToast({ open: true, type: 'success', text: 'Copied link', hideAt: Date.now() + 1200 }); } catch (_) {} }}
+                          className="px-3 h-9 rounded-xl bg-blue-600 text-white text-xs font-bold"
+                        >Copy</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
