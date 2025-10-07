@@ -1,4 +1,4 @@
-const API_BASE = import.meta?.env?.VITE_API_BASE || '';
+const API_BASE = import.meta?.env?.VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : '');
 
 // Fetch items for a module by its ObjectId (from curriculum flow)
 export async function fetchLessonItemsByModule(moduleId) {

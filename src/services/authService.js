@@ -3,7 +3,7 @@ import axios from 'axios';
 // The base URL of your backend API
 // For local development: use empty string to leverage Vite proxy
 // For production: use the full backend URL
-const BASE = import.meta.env.VITE_API_BASE || '';
+const BASE = import.meta.env.VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : '');
 const API_URL = `${BASE}/api/auth/`;
 
 // Debug logging

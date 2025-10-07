@@ -1,17 +1,12 @@
 services:
   - type: web
     name: hoshiyaar-frontend
-    env: static
-    buildCommand: npm run build
-    staticPublishPath: ./dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    headers:
-      - path: /*
-        name: X-Frame-Options
-        value: DENY
-      - path: /assets/*
-        name: Cache-Control
-        value: "public, max-age=31536000, immutable"
+    env: node
+    buildCommand: npm install && npm run build:spa
+    startCommand: npm start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: VITE_API_BASE
+        value: https://hoshiyaar-backend.onrender.com

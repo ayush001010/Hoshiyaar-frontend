@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-// Prefer Vite proxy on localhost; use VITE_API_BASE only in non-local envs
+// Prefer Vite proxy on localhost; use VITE_API_BASE or current origin in non-local envs
 const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)/.test(window.location.hostname);
-const API = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || '');
+const API = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : ''));
 
 const reviewService = {
   async listIncorrect(userId, moduleId, chapterId) {
