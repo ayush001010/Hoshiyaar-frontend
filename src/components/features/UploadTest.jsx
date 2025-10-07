@@ -190,14 +190,14 @@ export default function UploadTest() {
 
   return (
     <div className="min-h-screen bg-[#E5F0FE] p-6 md:p-8 flex items-center">
-      <div className="max-w-6xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+      <div className="max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-12 gap-10 items-start">
         {/* Left illustration */}
-        <div className="flex justify-center md:justify-end">
+        <div className="flex justify-center md:justify-start md:col-span-4">
           <img src={heroPoint} alt="Mascot pointing" className="w-[360px] md:w-[440px] h-auto drop-shadow-2xl" />
         </div>
 
         {/* Right upload card */}
-        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 w-full">
+        <div className="bg-white rounded-3xl shadow-2xl p-6 md:p-8 w-full md:col-span-8">
           <h1 className="text-3xl md:text-4xl font-extrabold text-blue-600 mb-2">Images Upload</h1>
           <p className="text-base text-gray-600 mb-5">Drop an image here or choose a file to upload.</p>
 
@@ -213,7 +213,7 @@ export default function UploadTest() {
               else if (list[0]) setFile(list[0]);
             }}
           >
-            <div className="flex items-center gap-5">
+            <div className="flex items-center justify-between gap-5 h-full">
               <div className="flex-1">
                 <div className="font-bold text-lg md:text-xl">Click to choose or drag & drop</div>
                 <div className="text-sm text-gray-500">PNG, JPG up to ~10MB (supports multiple)</div>
@@ -259,8 +259,14 @@ export default function UploadTest() {
                 <div className="text-sm text-gray-700">{uploadedImages.length} images ready to save</div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <a className="text-blue-600 underline" href={url} target="_blank" rel="noreferrer">Open uploaded image</a>
-                  <span className="text-xs text-gray-500 truncate">{url}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs text-gray-600 mb-1">Uploaded URL</div>
+                    <div className="w-full max-w-3xl rounded-xl border px-3 h-10 flex items-center bg-white text-xs text-gray-700 truncate" title={url}>{url}</div>
+                  </div>
+                  <button
+                    onClick={() => { try { navigator.clipboard.writeText(url || ''); setToast({ open: true, type: 'success', text: 'Copied link', hideAt: Date.now() + 1200 }); } catch (_) {} }}
+                    className="px-4 h-10 mt-5 self-center rounded-xl bg-blue-600 text-white text-sm font-bold"
+                  >Copy</button>
                 </div>
               )}
           {/* Linked selectors from Board → Subject → Chapter → Unit → Module → Item */}
@@ -283,7 +289,7 @@ export default function UploadTest() {
                   ))}
                 </select>
                 <select value={unitId} onChange={(e)=>{ setUnitId(e.target.value); setModuleId(''); setItemId(''); }} className="border rounded-xl px-3 py-2" disabled={!chapterId || units.length===0}>
-                  <option value="">Unit (optional)</option>
+                  <option value="">Unit</option>
                   {units.map(u => (<option key={u._id} value={u._id}>{u.title}</option>))}
                 </select>
                 <select value={moduleId} onChange={(e) => setModuleId(e.target.value)} className="border rounded-xl px-3 py-2" disabled={!chapterId}>
@@ -319,10 +325,14 @@ export default function UploadTest() {
       {/* Toast */}
       {toast.open && (
         <div
-          className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl text-white transition-all duration-500 ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'} ${Date.now() > toast.hideAt - 400 ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}`}
+          role="alert"
+          className={`fixed top-6 right-6 z-[10000] transition-all duration-500 ${Date.now() > toast.hideAt - 400 ? 'opacity-0 translate-x-2' : 'opacity-100 translate-x-0'}`}
           onTransitionEnd={() => { if (Date.now() >= toast.hideAt) setToast((t) => ({ ...t, open: false })); }}
         >
-          {toast.text}
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl ring-1 backdrop-blur bg-white/90 ${toast.type === 'success' ? 'ring-green-200' : 'ring-red-200'}`}>
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'} text-white text-sm font-extrabold`}>{toast.type === 'success' ? '✓' : '!'}</div>
+            <div className={`text-sm font-extrabold ${toast.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>{toast.text}</div>
+          </div>
         </div>
       )}
     </div>
