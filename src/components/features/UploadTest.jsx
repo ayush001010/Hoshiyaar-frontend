@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import heroPoint from '../../assets/images/imageUpload.png';
 
+// API base URL configuration - same logic as other services
+const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)/.test(window.location.hostname);
+const API_BASE = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : ''));
+
 export default function UploadTest() {
   const [file, setFile] = useState(null);
   const [files, setFiles] = useState([]);
@@ -42,7 +46,7 @@ export default function UploadTest() {
         form.append('file', file);
       }
       form.append('folder', 'hoshiyaar-test');
-      const res = await fetch(many ? '/api/upload/images' : '/api/upload/image', {
+      const res = await fetch(`${API_BASE}${many ? '/api/upload/images' : '/api/upload/image'}`, {
         method: 'POST',
         body: form,
       });
@@ -74,7 +78,7 @@ export default function UploadTest() {
       const body = uploadedImages.length > 0
         ? { images: uploadedImages.map(i => i.url), imagePublicIds: uploadedImages.map(i => i.public_id), append: true }
         : { images: [url], imagePublicIds: [publicId], append: true };
-      const resp = await fetch(`/api/curriculum/items/${itemId}/image`, {
+      const resp = await fetch(`${API_BASE}/api/curriculum/items/${itemId}/image`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -95,7 +99,7 @@ export default function UploadTest() {
       setError('');
       if (!itemId) throw new Error('Select CurriculumItem');
       if (!window.confirm('Remove all images from this item?')) return;
-      const resp = await fetch(`/api/curriculum/items/${itemId}/image`, {
+      const resp = await fetch(`${API_BASE}/api/curriculum/items/${itemId}/image`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ images: [], imagePublicIds: [], append: false })
@@ -113,7 +117,7 @@ export default function UploadTest() {
   React.useEffect(() => {
     (async () => {
       try {
-        const b = await fetch('/api/curriculum/boards').then(r=>r.json());
+        const b = await fetch(`${API_BASE}/api/curriculum/boards`).then(r=>r.json());
         setBoards(Array.isArray(b) ? b : []);
       } catch (_) {}
     })();
@@ -123,7 +127,7 @@ export default function UploadTest() {
   React.useEffect(() => {
     (async () => {
       try {
-        const c = await fetch(`/api/curriculum/classes?board=${encodeURIComponent(board)}`).then(r=>r.json());
+        const c = await fetch(`${API_BASE}/api/curriculum/classes?board=${encodeURIComponent(board)}`).then(r=>r.json());
         setClasses(Array.isArray(c) ? c : []);
       } catch (_) { setClasses([]); }
     })();
@@ -133,7 +137,7 @@ export default function UploadTest() {
   React.useEffect(() => {
     (async () => {
       try {
-        const url = `/api/curriculum/subjects?board=${encodeURIComponent(board)}${classTitle ? `&classTitle=${encodeURIComponent(classTitle)}` : ''}`;
+        const url = `${API_BASE}/api/curriculum/subjects?board=${encodeURIComponent(board)}${classTitle ? `&classTitle=${encodeURIComponent(classTitle)}` : ''}`;
         const s = await fetch(url).then(r=>r.json());
         setSubjects(Array.isArray(s) ? s : []);
       } catch (_) { setSubjects([]); }
@@ -145,7 +149,7 @@ export default function UploadTest() {
     (async () => {
       if (!board || !subject) { setChapters([]); setChapterId(''); return; }
       try {
-        const url = `/api/curriculum/chapters?board=${encodeURIComponent(board)}&subject=${encodeURIComponent(subject)}${classTitle ? `&classTitle=${encodeURIComponent(classTitle)}` : ''}`;
+        const url = `${API_BASE}/api/curriculum/chapters?board=${encodeURIComponent(board)}&subject=${encodeURIComponent(subject)}${classTitle ? `&classTitle=${encodeURIComponent(classTitle)}` : ''}`;
         const data = await fetch(url).then(r=>r.json());
         setChapters(Array.isArray(data) ? data : []);
       } catch (_) { setChapters([]); }
@@ -157,9 +161,9 @@ export default function UploadTest() {
     if (!chapterId) { setUnits([]); setModules([]); setUnitId(''); setModuleId(''); setItems([]); setItemId(''); return; }
     (async () => {
       try {
-        const u = await fetch(`/api/curriculum/units?chapterId=${chapterId}`).then(r=>r.json());
+        const u = await fetch(`${API_BASE}/api/curriculum/units?chapterId=${chapterId}`).then(r=>r.json());
         setUnits(Array.isArray(u) ? u : []);
-        const res = await fetch(`/api/curriculum/modules?chapterId=${chapterId}`).then(r=>r.json());
+        const res = await fetch(`${API_BASE}/api/curriculum/modules?chapterId=${chapterId}`).then(r=>r.json());
         setModules(Array.isArray(res) ? res : []);
       } catch (_) {}
     })();
@@ -170,7 +174,7 @@ export default function UploadTest() {
     (async () => {
       if (!unitId) return; // optional
       try {
-        const m = await fetch(`/api/curriculum/modules?unitId=${unitId}`).then(r=>r.json());
+        const m = await fetch(`${API_BASE}/api/curriculum/modules?unitId=${unitId}`).then(r=>r.json());
         setModules(Array.isArray(m) ? m : []);
       } catch (_) {}
     })();
@@ -181,7 +185,7 @@ export default function UploadTest() {
     if (!moduleId) { setItems([]); setItemId(''); return; }
     (async () => {
       try {
-        const res = await fetch(`/api/curriculum/items?moduleId=${moduleId}`);
+        const res = await fetch(`${API_BASE}/api/curriculum/items?moduleId=${moduleId}`);
         const data = await res.json();
         setItems(Array.isArray(data) ? data : []);
       } catch (_) {}
