@@ -9,6 +9,7 @@ export default function UploadTest() {
   const [file, setFile] = useState(null);
   const [files, setFiles] = useState([]);
   const [url, setUrl] = useState('');
+  const [manualUrl, setManualUrl] = useState('');
   const [publicId, setPublicId] = useState('');
   const [itemId, setItemId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -74,10 +75,12 @@ export default function UploadTest() {
     try {
       setError('');
       if (!itemId) throw new Error('Enter CurriculumItem ID');
-      if (!url && uploadedImages.length === 0) throw new Error('Upload an image first');
+      const chosenUrl = manualUrl || url;
+      if (!chosenUrl && uploadedImages.length === 0) throw new Error('Provide an image URL or upload one');
       const body = uploadedImages.length > 0
         ? { images: uploadedImages.map(i => i.url), imagePublicIds: uploadedImages.map(i => i.public_id), append: true }
-        : { images: [url], imagePublicIds: [publicId], append: true };
+        : { images: [chosenUrl], append: true };
+      if (publicId) body.imagePublicIds = [publicId];
       const resp = await fetch(`${API_BASE}/api/curriculum/items/${itemId}/image`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -265,7 +268,12 @@ export default function UploadTest() {
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="text-xs text-gray-600 mb-1">Uploaded URL</div>
-                    <div className="w-full max-w-3xl rounded-xl border px-3 h-10 flex items-center bg-white text-xs text-gray-700 truncate" title={url}>{url}</div>
+                    <input
+                      value={url}
+                      readOnly
+                      placeholder="https://..."
+                      className="w-full max-w-3xl rounded-xl border px-3 h-10 bg-white text-xs text-gray-700"
+                    />
                   </div>
                   <button
                     onClick={() => { try { navigator.clipboard.writeText(url || ''); setToast({ open: true, type: 'success', text: 'Copied link', hideAt: Date.now() + 1200 }); } catch (_) {} }}
@@ -273,6 +281,16 @@ export default function UploadTest() {
                   >Copy</button>
                 </div>
               )}
+              {/* Manual link slot */}
+              <div className="mt-4">
+                <div className="text-xs text-gray-600 mb-1">Or paste an existing image URL</div>
+                <input
+                  value={manualUrl}
+                  onChange={(e)=>setManualUrl(e.target.value)}
+                  placeholder="Paste previous image link here"
+                  className="w-full max-w-3xl rounded-xl border px-3 h-10 bg-white text-xs text-gray-700"
+                />
+              </div>
           {/* Linked selectors from Board → Subject → Chapter → Unit → Module → Item */}
           <div className="mt-5 grid grid-cols-1 md:grid-cols-6 gap-3">
                 <select value={board} onChange={(e)=>{ setBoard(e.target.value); setChapterId(''); setUnitId(''); setModuleId(''); setItemId(''); }} className="border rounded-xl px-3 py-2">
