@@ -1,34 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import ConceptExitConfirm from '../../modals/ConceptExitConfirm.jsx';
+import React from 'react';
 
 const ConceptLayout = ({ children, footer, onQuit }) => {
-  const [showExitConfirm, setShowExitConfirm] = useState(false);
-
-  useEffect(() => {
-    const handlePop = () => {
-      setShowExitConfirm(true);
-      try { window.history.pushState(null, '', window.location.href); } catch (_) {}
-    };
-    const handleKey = (e) => {
-      // Trap common back navigation shortcut (Alt + Left Arrow)
-      if (e.altKey && e.key === 'ArrowLeft') {
-        e.preventDefault();
-        setShowExitConfirm(true);
-      }
-    };
-    try { window.history.pushState(null, '', window.location.href); } catch (_) {}
-    window.addEventListener('popstate', handlePop);
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('popstate', handlePop);
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, []);
-
-  const quit = () => {
-    if (typeof onQuit === 'function') onQuit();
-    else try { window.location.href = '/learn'; } catch (_) {}
-  };
+  // Back/exit modal removed: allow normal browser navigation
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-6">
@@ -42,11 +15,6 @@ const ConceptLayout = ({ children, footer, onQuit }) => {
           </div>
         </div>
       </div>
-      {showExitConfirm && (
-        <div className="fixed inset-0 z-[9999]">
-          <ConceptExitConfirm onQuit={quit} onContinue={() => setShowExitConfirm(false)} />
-        </div>
-      )}
     </div>
   );
 };

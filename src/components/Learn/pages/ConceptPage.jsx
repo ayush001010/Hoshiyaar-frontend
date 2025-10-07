@@ -16,25 +16,7 @@ export default function ConceptPage() {
   const item = useMemo(() => items[index] || null, [items, index]);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
-  useEffect(() => {
-    const handlePop = () => {
-      setShowExitConfirm(true);
-      try { window.history.pushState(null, '', window.location.href); } catch (_) {}
-    };
-    const handleKey = (e) => {
-      if (e.altKey && e.key === 'ArrowLeft') {
-        e.preventDefault();
-        setShowExitConfirm(true);
-      }
-    };
-    try { window.history.pushState(null, '', window.location.href); } catch (_) {}
-    window.addEventListener('popstate', handlePop);
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('popstate', handlePop);
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, []);
+  // Removed back/popstate interception
 
   function routeForType(type, idx) {
     switch (type) {
