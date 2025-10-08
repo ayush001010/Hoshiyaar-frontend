@@ -16,7 +16,7 @@ const Header = () => {
     <header className="sticky top-0 bg-white border-b border-duo-gray h-20 flex items-center z-50">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <Link to="/" className="flex items-center gap-4">
-          <span className="text-2xl font-extrabold text-duo-blue tracking-tight">Hoshiyaar</span>
+          <span className="text-3xl md:text-4xl font-extrabold text-duo-blue tracking-tight">Hoshiyaar</span>
         </Link>
         <div>
           {user ? (

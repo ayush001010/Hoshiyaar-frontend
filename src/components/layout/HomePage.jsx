@@ -14,7 +14,7 @@ const HomePage = () => (
     {/* I've uncommented LanguageScroller, assuming you have this component */}
     {/* <LanguageScroller /> */}
     
-    {features.map((feature, index) => (
+    {features.slice(0, 2).map((feature, index) => (
       <FeatureSection
         key={index}
         title={feature.title}
@@ -25,11 +25,9 @@ const HomePage = () => (
       </FeatureSection>
     ))}
     
-    <AppDownloadSection />
+    {/* <AppDownloadSection /> */}
     
-    {products.map((product, index) => (
-      <ProductSection key={index} {...product} />
-    ))}
+    {/* Removed product sections */}
     
     <FinalCTA />
   </>

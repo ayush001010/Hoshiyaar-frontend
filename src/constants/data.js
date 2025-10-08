@@ -17,13 +17,13 @@ import productImage4 from '../assets/images/image-01.png'; // Image for 'math'
 export const features = [
     {
       title: 'free. fun. effective.',
-      description: 'Learning with Hoshiyaar is fun, and research shows that it works! With quick, bite-sized lessons, you’ll earn points and unlock new levels while gaining real-world communication skills.',
+      description: 'Your one-stop buddy for everything study — super easy to start and totally free!',
       imgSrc: featureImage1, // Use variable here
       imageSide: 'right',
     },
     {
       title: 'backed by science',
-      description: 'We use a combination of research-backed teaching methods and delightful content to create courses that effectively teach reading, writing, listening, and speaking skills.',
+      description: '        Your Study buddy and yaar, HoshiYaar is here to make learning smart, simple, and seriously fun.',
       imgSrc: featureImage2, // Use variable here
       imageSide: 'left',
     },

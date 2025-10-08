@@ -7,7 +7,7 @@ import authService from '../../services/authService.js';
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: '',
   });
   const [error, setError] = useState('');
@@ -48,11 +48,11 @@ const Login = () => {
 
         <form onSubmit={onSubmit} className="space-y-4">
           <input
-            type="email"
-            name="email"
-            value={formData.email}
+            type="text"
+            name="username"
+            value={formData.username}
             onChange={onChange}
-            placeholder="Email or username"
+            placeholder="Username"
             className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
             required
           />

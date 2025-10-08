@@ -408,7 +408,7 @@ export default function RevisionList() {
           if ((items || []).length === 0) return <div>No default items found for this unit.</div>;
           return (
             <>
-              <div className="text-left mb-4">
+              <div className="mb-4 flex items-center justify-center">
                 <button onClick={startReview} className="inline-block px-6 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white text-base font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.15)]">Start Super Important Revision</button>
               </div>
               <ul className="space-y-4 mb-10">
@@ -476,7 +476,7 @@ export default function RevisionList() {
       ) : (
         <>
           {moduleId && (
-            <div className="text-left mb-4">
+            <div className="mb-4 flex items-center justify-center">
               <button onClick={startReview} className="inline-block px-6 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white text-base font-extrabold shadow-[0_6px_0_0_rgba(0,0,0,0.15)]">Start Re-attempt</button>
             </div>
           )}

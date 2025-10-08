@@ -6,9 +6,10 @@ import BackButton from '../ui/BackButton.jsx';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', board: '', className: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', board: '', classLevel: '', age: '', dateOfBirth: '' });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [mascotSrc, setMascotSrc] = useState(heroChar);
 
   // Fetch user details from DB (ignore subject/chapter), fallback to 'Not Defined' where absent
@@ -23,7 +24,9 @@ export default function ProfilePage() {
           email: (dbUser.email ?? 'Not Defined'),
           phone: (dbUser.phone ?? 'Not Defined'),
           board: (dbUser.board ?? 'Not Defined'),
-          className: (dbUser.class ?? dbUser.className ?? 'Not Defined'),
+          classLevel: (dbUser.classLevel ?? 'Not Defined'),
+          age: (dbUser.age ?? 'Not Defined'),
+          dateOfBirth: dbUser.dateOfBirth ? String(dbUser.dateOfBirth).slice(0,10) : 'Not Defined',
         });
       } catch (_) {
         // Fallback to auth context if fetch fails
@@ -32,7 +35,9 @@ export default function ProfilePage() {
           email: (user?.email ?? 'Not Defined'),
           phone: (user?.phone ?? 'Not Defined'),
           board: (user?.board ?? 'Not Defined'),
-          className: (user?.class ?? user?.className ?? 'Not Defined'),
+          classLevel: (user?.classLevel ?? 'Not Defined'),
+          age: (user?.age ?? 'Not Defined'),
+          dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).slice(0,10) : 'Not Defined',
         });
       }
     };
@@ -44,19 +49,37 @@ export default function ProfilePage() {
   const handleSave = async () => {
     if (!user?._id) return;
     setSaving(true);
+    setSaveError('');
     try {
-      await authService.updateOnboarding({
+      // Normalize date to YYYY-MM-DD if user agent produced DD-MM-YYYY
+      let dob = form.dateOfBirth;
+      if (dob && dob !== 'Not Defined') {
+        // Accept values like '30-10-2025' and convert to '2025-10-30'
+        if (/^\d{2}-\d{2}-\d{4}$/.test(dob)) {
+          const [dd, mm, yyyy] = dob.split('-');
+          dob = `${yyyy}-${mm}-${dd}`;
+        }
+      } else {
+        dob = null;
+      }
+      await authService.updateProfile({
         userId: user._id,
-        board: form.board === 'Not Defined' ? '' : form.board,
+        board: form.board === 'Not Defined' ? null : form.board,
         subject: user.subject,
         chapter: user.chapter,
-        name: form.name === 'Not Defined' ? '' : form.name,
-        phone: form.phone === 'Not Defined' ? '' : form.phone,
-        className: form.className === 'Not Defined' ? '' : form.className,
+        name: form.name === 'Not Defined' ? null : form.name,
+        phone: form.phone === 'Not Defined' ? null : form.phone,
+        classLevel: form.classLevel === 'Not Defined' ? null : form.classLevel,
+        dateOfBirth: dob,
+        email: form.email === 'Not Defined' ? null : form.email,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
-    } catch (_) {}
+    } catch (e) {
+      const msg = e?.response?.data?.message || 'Update failed. Please try again.';
+      setSaveError(msg);
+      console.error('Profile update failed', e?.response?.data || e?.message);
+    }
     setSaving(false);
   };
 
@@ -82,8 +105,8 @@ export default function ProfilePage() {
             <input placeholder={form.name || 'Not Defined'} value={form.name} onChange={e=>update('name', e.target.value)} className="mt-1 w-full px-4 py-3 rounded-2xl border-2 border-blue-200 focus:outline-none focus:border-blue-400" />
           </label>
           <label className="block">
-            <span className="text-sm font-bold text-gray-700">Email Id</span>
-            <input placeholder={form.email || 'Not Defined'} value={form.email} disabled className="mt-1 w-full px-4 py-3 rounded-2xl border-2 bg-gray-50 border-blue-200" />
+            <span className="text-sm font-bold text-gray-700">Email</span>
+            <input placeholder={form.email || 'Not Defined'} value={form.email} onChange={e=>update('email', e.target.value)} className="mt-1 w-full px-4 py-3 rounded-2xl border-2 border-blue-200 focus:outline-none focus:border-blue-400" />
           </label>
           <label className="block">
             <span className="text-sm font-bold text-gray-700">Phone number</span>
@@ -95,13 +118,22 @@ export default function ProfilePage() {
           </label>
           <label className="block">
             <span className="text-sm font-bold text-gray-700">Class</span>
-            <input placeholder={form.className || 'Not Defined'} value={form.className} onChange={e=>update('className', e.target.value)} className="mt-1 w-full px-4 py-3 rounded-2xl border-2 border-blue-200 focus:outline-none focus:border-blue-400" />
+            <input placeholder={form.classLevel || 'Not Defined'} value={form.classLevel} onChange={e=>update('classLevel', e.target.value)} className="mt-1 w-full px-4 py-3 rounded-2xl border-2 border-blue-200 focus:outline-none focus:border-blue-400" />
+          </label>
+          <label className="block">
+            <span className="text-sm font-bold text-gray-700">Age</span>
+            <input placeholder={String(form.age || 'Not Defined')} value={form.age} onChange={e=>update('age', e.target.value)} disabled className="mt-1 w-full px-4 py-3 rounded-2xl border-2 bg-gray-50 border-blue-200" />
+          </label>
+          <label className="block">
+            <span className="text-sm font-bold text-gray-700">Date of Birth</span>
+            <input type="date" placeholder={form.dateOfBirth || 'Not Defined'} value={form.dateOfBirth === 'Not Defined' ? '' : form.dateOfBirth} onChange={e=>update('dateOfBirth', e.target.value)} className="mt-1 w-full px-4 py-3 rounded-2xl border-2 border-blue-200 focus:outline-none focus:border-blue-400" />
           </label>
         </div>
         <div className="mt-8 text-center">
           <button onClick={handleSave} disabled={saving} className="px-10 py-4 rounded-3xl bg-blue-600 hover:bg-blue-700 text-white text-xl font-extrabold shadow-[0_10px_0_0_rgba(0,0,0,0.15)] disabled:opacity-60">
             {saving ? 'Saving…' : 'Save'}
           </button>
+          {saveError && <div className="mt-3 text-red-600 font-bold">{saveError}</div>}
           {saved && <div className="mt-3 text-green-700 font-bold">Saved!</div>}
         </div>
       </div>

@@ -18,19 +18,11 @@ const Hero = () => (
       {/* Right: Text and Buttons */}
       <div className="flex-1 text-center lg:text-left">
         <h1 className="text-3xl md:text-5xl font-extrabold text-duo-text mb-6">
-          The free, fun, and effective way to learn a language!
-        </h1>
+        Learn anything, anytime, anywhere — your pace, your way.        </h1>
         <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-          {/* Link "Get Started" to the Signup page */}
           <Link to="/signup">
-            <button className="w-full sm:w-auto bg-duo-blue text-white font-bold uppercase tracking-wider py-4 px-10 rounded-2xl border-b-4 border-duo-blue-dark hover:bg-blue-500 transition">
+            <button className="w-full sm:w-auto bg-duo-blue text-white font-bold uppercase tracking-wider py-4 px-16 md:px-20 rounded-2xl border-b-4 border-duo-blue-dark hover:bg-blue-500 transition min-w-[240px]">
               Get Started
-            </button>
-          </Link>
-          {/* Link "I already have an account" to the Login page */}
-          <Link to="/login">
-            <button className="w-full sm:w-auto bg-white text-duo-blue font-bold uppercase tracking-wider py-4 px-10 rounded-2xl border-2 border-duo-gray hover:bg-gray-100 transition">
-              I already have an account
             </button>
           </Link>
         </div>

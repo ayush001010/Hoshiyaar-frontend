@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AuthLayout from './AuthLayout';
 import authService from '../../services/authService.js';
@@ -8,17 +8,39 @@ const Signup = () => {
   const [step, setStep] = useState(1); // 1: age, 2: profile
   const [formData, setFormData] = useState({
     age: '',
+    username: '',
     name: '',
-    email: '',
     password: '',
+    dateOfBirth: '',
+    classLevel: '',
   });
   const [error, setError] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState({ checking: false, available: null, message: '' });
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const onChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
+
+  // Debounced username availability check
+  useEffect(() => {
+    const value = formData.username?.trim();
+    if (!value) {
+      setUsernameStatus({ checking: false, available: null, message: '' });
+      return;
+    }
+    setUsernameStatus((s) => ({ ...s, checking: true, message: '' }));
+    const id = setTimeout(async () => {
+      try {
+        const { data } = await authService.checkUsername(value);
+        setUsernameStatus({ checking: false, available: !!data?.available, message: data?.available ? 'Username available' : 'Username already taken' });
+      } catch (e) {
+        setUsernameStatus({ checking: false, available: null, message: 'Unable to verify username' });
+      }
+    }, 400);
+    return () => clearTimeout(id);
+  }, [formData.username]);
 
   const handleNext = () => {
     if (!formData.age) return;
@@ -30,10 +52,12 @@ const Signup = () => {
     setError('');
     try {
       const response = await authService.register({
+        username: formData.username.trim(),
         name: formData.name,
-        email: formData.email,
         password: formData.password,
         age: Number(formData.age),
+        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth) : null,
+        classLevel: formData.classLevel || null,
       });
       if (response.data && response.data.token) {
         login(response.data);
@@ -82,21 +106,39 @@ const Signup = () => {
             <form onSubmit={onSubmit} className="space-y-4">
               <input
                 type="text"
+                name="username"
+                value={formData.username}
+                onChange={onChange}
+                placeholder="Username (unique)"
+                className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+                required
+              />
+              <input
+                type="text"
                 name="name"
                 value={formData.name}
                 onChange={onChange}
                 placeholder="Name"
                 className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
               />
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={onChange}
-                placeholder="Email"
-                className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
-                required
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="date"
+                  name="dateOfBirth"
+                  value={formData.dateOfBirth}
+                  onChange={onChange}
+                  placeholder="Date of Birth"
+                  className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+                />
+                <input
+                  type="text"
+                  name="classLevel"
+                  value={formData.classLevel}
+                  onChange={onChange}
+                  placeholder="Class"
+                  className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+                />
+              </div>
               <input
                 type="password"
                 name="password"
@@ -108,10 +150,14 @@ const Signup = () => {
               />
               <button
                 type="submit"
-                className="w-full bg-duo-blue text-white font-bold uppercase tracking-wider py-4 rounded-2xl border-b-4 border-duo-blue-dark hover:bg-blue-500 transition"
+                disabled={usernameStatus.available === false || usernameStatus.checking}
+                className={`w-full text-white font-bold uppercase tracking-wider py-4 rounded-2xl border-b-4 transition ${usernameStatus.available === false || usernameStatus.checking ? 'bg-gray-500 border-gray-600 cursor-not-allowed' : 'bg-duo-blue border-duo-blue-dark hover:bg-blue-500'}`}
               >
                 Create Account
                     </button>
+              {usernameStatus.message && (
+                <p className={`text-xs text-left ${usernameStatus.available ? 'text-green-400' : 'text-red-400'}`}>{usernameStatus.message}</p>
+              )}
               <p className="text-xs text-gray-400 text-left">
                 By creating an account, you agree to our <span className="text-duo-blue font-bold">Terms</span>
                 &nbsp;and <span className="text-duo-blue font-bold">Privacy Policy</span>.
