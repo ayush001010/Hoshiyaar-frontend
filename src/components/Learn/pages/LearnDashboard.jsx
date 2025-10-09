@@ -467,8 +467,8 @@ const LearnDashboard = ({ onboardingData }) => {
                         key={u._id || unitIdx}
                         className="relative pt-12 pb-28"
                       >
-                         {/* Unit header card */}
-                         <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-5 rounded-3xl flex justify-between items-center mb-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] max-w-3xl mx-auto">
+                         {/* Unit header card - sticky until next unit */}
+                         <div className="sticky top-0 z-30 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-5 rounded-3xl flex justify-between items-center mb-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] max-w-3xl mx-auto">
                            <div>
                              <p className="font-extrabold text-xl md:text-2xl">
                                {u.title || unitTitle || `Unit ${unitIdx + 1}`}
