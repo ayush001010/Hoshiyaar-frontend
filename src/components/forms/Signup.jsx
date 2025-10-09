@@ -113,6 +113,11 @@ const Signup = () => {
                 className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
                 required
               />
+              {usernameStatus.message && (
+                <p aria-live="polite" className={`text-xs text-left ${usernameStatus.available ? 'text-green-400' : 'text-red-400'}`}>
+                  {usernameStatus.message}
+                </p>
+              )}
               <input
                 type="text"
                 name="name"
@@ -155,9 +160,6 @@ const Signup = () => {
               >
                 Create Account
                     </button>
-              {usernameStatus.message && (
-                <p className={`text-xs text-left ${usernameStatus.available ? 'text-green-400' : 'text-red-400'}`}>{usernameStatus.message}</p>
-              )}
               <p className="text-xs text-gray-400 text-left">
                 By creating an account, you agree to our <span className="text-duo-blue font-bold">Terms</span>
                 &nbsp;and <span className="text-duo-blue font-bold">Privacy Policy</span>.

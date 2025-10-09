@@ -59,6 +59,7 @@ const LearnDashboard = ({ onboardingData }) => {
   const [modulesList, setModulesList] = useState([]); // fetched modules for this chapter
   const [unitTitle, setUnitTitle] = useState('');
   const [unitsList, setUnitsList] = useState([]);
+  const [unitModulesMap, setUnitModulesMap] = useState({}); // { unitId: Module[] }
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [showChapters, setShowChapters] = useState(false);
   const [chapterStats, setChapterStats] = useState({}); // { [chapterId]: { total, completed } }
@@ -102,6 +103,17 @@ const LearnDashboard = ({ onboardingData }) => {
             const unitsResp = await cur.listUnits(ch._id);
             const units = unitsResp?.data || [];
             setUnitsList(units);
+            // Fetch modules for ALL units to enable stacked timelines
+            const nextMap = {};
+            for (const u of units) {
+              try {
+                const mods = await cur.listModulesByUnit(u._id);
+                nextMap[u._id] = mods?.data || [];
+              } catch (_) {
+                nextMap[u._id] = [];
+              }
+            }
+            setUnitModulesMap(nextMap);
             let lastMap = {};
             try { lastMap = JSON.parse(localStorage.getItem('last_unit_by_chapter') || '{}'); } catch (_) { lastMap = {}; }
             const preferredUnitId = (new URLSearchParams(window.location.search)).get('unitId') || lastMap?.[ch._id];
@@ -221,8 +233,8 @@ const LearnDashboard = ({ onboardingData }) => {
 
       <main className="flex-grow p-3 md:p-6 overflow-auto no-scrollbar bg-transparent">
 
-        {/* Section Header (hide when viewing chapters list) */}
-        {!showChapters && (
+        {/* Section Header (hide when viewing chapters list). If units exist, headers are shown per unit below, so hide this top one. */}
+        {!showChapters && unitsList.length === 0 && (
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-5 rounded-3xl flex justify-between items-center mb-6 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] max-w-3xl mx-auto">
                         <div>
             {/* Unit on top */}
@@ -249,8 +261,8 @@ const LearnDashboard = ({ onboardingData }) => {
                 </div>
         )}
                 
-        {/* Vertical timeline */}
-        <div className={`${showChapters ? 'relative w-full' : 'relative max-w-4xl'} mx-auto h-[80vh] overflow-y-auto no-scrollbar`} style={{ minHeight: listHeight + centerTopOffset + 160 }}>
+        {/* Vertical timelines - stacked per unit (scroll to view more) */}
+        <div className={`${showChapters ? 'relative w-full' : 'relative max-w-4xl'} mx-auto h-[80vh] overflow-y-auto no-scrollbar`}>
           {showChapters ? (
             <div className="w-full px-4 md:px-8">
               <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-3xl p-6 md:p-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] ring-4 ring-white/20 w-full">
@@ -295,9 +307,27 @@ const LearnDashboard = ({ onboardingData }) => {
           ) : (
             <>
               {/* Center line (dynamic height) */}
-              <div className="absolute left-1/2 -translate-x-1/2 w-3 bg-blue-300 rounded-full z-20 shadow-[0_0_0_6px_rgba(255,255,255,0.5)]" style={{ top: centerTopOffset, height: lineHeight }} />
-              <div className="relative flex flex-col items-center gap-24 pt-28 pb-8">
-            {levels.map((mod, index) => {
+              {/* Render each unit block one after another */}
+              {(unitsList.length ? unitsList : [{ _id: 'default', title: unitTitle }]).map((u, unitIdx) => {
+                const unitMods = (unitModulesMap[u._id] || modulesList);
+                const localLevels = unitMods.length > 0 ? unitMods : [ {}, {}, {}, {} ];
+                // Make the center line span from the first star to the revision star
+                // Start line a bit below the unit header and stop slightly above the next header
+                const localLineHeight = Math.max(120, ((localLevels.length - 1) * rowSpacing) + 100);
+                return (
+                  <div key={u._id || unitIdx} className="relative pt-12 pb-28">
+                    {/* Unit header card */}
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-5 rounded-3xl flex justify-between items-center mb-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] max-w-3xl mx-auto">
+                      <div>
+                        <p className="font-extrabold text-xl md:text-2xl">{u.title || unitTitle || `Unit ${unitIdx+1}`}</p>
+                        {chapterTitle && <p className="opacity-95 text-base md:text-lg">{chapterTitle}</p>}
+                        <p className="opacity-90 text-sm md:text-base">{subjectName}</p>
+                      </div>
+                    </div>
+                    {/* Center line for this unit */}
+                    <div className="absolute left-1/2 -translate-x-1/2 w-3 bg-blue-300 rounded-full z-20 shadow-[0_0_0_6px_rgba(255,255,255,0.5)]" style={{ top: 240, height: localLineHeight }} />
+                    <div className="relative flex flex-col items-center gap-24 pt-28 pb-8">
+            {localLevels.map((mod, index) => {
               const p = progress.find(c => c.chapter === index + 1);
               let status = 'locked';
               if (p && p.conceptCompleted) status = 'completed';
@@ -340,7 +370,7 @@ const LearnDashboard = ({ onboardingData }) => {
                             disabled={!canClick}
                             onClick={() => {
                               if (!canClick) return;
-                              const moduleId = modulesList[index]?._id;
+                              const moduleId = unitMods[index]?._id;
                               if (moduleId) navigate(`/learn/module/${moduleId}`);
                             }}
                           />
@@ -356,8 +386,8 @@ const LearnDashboard = ({ onboardingData }) => {
                     }`}
                     style={{ zIndex: 40 }}
                   >
-                    <div className="text-2xl font-extrabold mt-1 text-blue-700">{(modulesList[index]?.title) || moduleTitle || '—'}</div>
-                    <div className="text-xl font-semibold text-blue-700/80">{unitTitle || '—'}</div>
+                    <div className="text-2xl font-extrabold mt-1 text-blue-700">{(unitMods[index]?.title) || moduleTitle || '—'}</div>
+                    <div className="text-xl font-semibold text-blue-700/80">{u.title || unitTitle || '—'}</div>
                     <div className="text-base font-medium text-blue-700/60">{chapterTitle || '—'}</div>
                   </div>
                 </div>
@@ -372,18 +402,21 @@ const LearnDashboard = ({ onboardingData }) => {
                   {starAlignRight ? (
                     <div className="absolute left-1/2 top-1/2 -translate-y-1/2 w-1/2 flex items-center">
                       <div className="h-2 md:h-3 bg-blue-300/60 rounded-full" style={{ width: `calc(50% - 90px)` }}></div>
-                      <RevisionStar align="right" chapterId={chapterId} unitId={unitsList?.[0]?._id} />
+                      <RevisionStar align="right" chapterId={chapterId} unitId={u?._id} />
                     </div>
                   ) : (
                     <div className="absolute right-1/2 top-1/2 -translate-y-1/2 w-1/2 flex items-center justify-end">
-                      <RevisionStar align="left" chapterId={chapterId} unitId={unitsList?.[0]?._id} />
+                      <RevisionStar align="left" chapterId={chapterId} unitId={u?._id} />
                       <div className="h-2 md:h-3 bg-blue-300/60 rounded-full" style={{ width: `calc(50% - 90px)` }}></div>
                     </div>
                   )}
                 </div>
               );
             })()}
-          </div>
+                    </div>
+                  </div>
+                );
+              })}
             </>
           )}
         </div>

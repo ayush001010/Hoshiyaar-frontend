@@ -81,10 +81,11 @@ export default function ConceptPage() {
             {item.title}
           </h2>
         )}
-        <div className="w-full max-w-4xl mt-6">
-          <p className="text-3xl font-extrabold text-gray-900 leading-relaxed whitespace-pre-wrap text-center">
-            {item.text || item.content}
-          </p>
+        <div className="w-full max-w-4xl mt-10">
+          <p
+            className="text-3xl font-extrabold text-gray-900 leading-relaxed whitespace-pre-wrap text-center"
+            dangerouslySetInnerHTML={{ __html: String(item.text || item.content || '') }}
+          />
         </div>
 
         {/* Images block (between text and button) */}

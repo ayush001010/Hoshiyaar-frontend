@@ -22,7 +22,7 @@ export const features = [
       imageSide: 'right',
     },
     {
-      title: 'backed by science',
+      title: 'because learning shouldn’t be boring',
       description: '        Your Study buddy and yaar, HoshiYaar is here to make learning smart, simple, and seriously fun.',
       imgSrc: featureImage2, // Use variable here
       imageSide: 'left',
