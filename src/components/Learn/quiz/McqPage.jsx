@@ -14,6 +14,29 @@ import { useReview } from '../../../context/ReviewContext.jsx';
 // Inline feedback bar instead of modal
 
 export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
+  // Local storage helpers for dashboard progress sync
+  const LS_KEY = 'lesson_progress_v1';
+  const markCompletedLocal = (chapterZeroIdx) => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      const store = raw ? JSON.parse(raw) : {};
+      const key = 'default';
+      const set = new Set(store[key] || []);
+      if (Number.isInteger(chapterZeroIdx) && chapterZeroIdx >= 0) set.add(chapterZeroIdx);
+      store[key] = Array.from(set);
+      localStorage.setItem(LS_KEY, JSON.stringify(store));
+    } catch (_) {}
+  };
+  const IDS_KEY = 'lesson_completed_ids_v1';
+  const recordCompletedId = (moduleId) => {
+    try {
+      const raw = localStorage.getItem(IDS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      const set = new Set(arr);
+      if (moduleId) set.add(String(moduleId));
+      localStorage.setItem(IDS_KEY, JSON.stringify(Array.from(set)));
+    } catch (_) {}
+  };
   const navigate = useNavigate();
   const { moduleNumber, index: indexParam } = useParams();
   const index = Number(indexParam || 0);
@@ -88,7 +111,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
       } else {
         // after result, go next
         console.log('[MCQ] Continuing via Enter');
-        goNext();
+        handleNext();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -194,6 +217,13 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
       // Finished module: now count progress
       try {
         if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), conceptCompleted: true });
+      } catch (_) {}
+      // Also persist locally so dashboard immediately reflects completion
+      try {
+        const zeroIdx = Number(moduleNumber) - 1;
+        markCompletedLocal(zeroIdx);
+        // Store by module id
+        recordCompletedId(moduleNumber);
       } catch (_) {}
       return navigate('/lesson-complete');
     }

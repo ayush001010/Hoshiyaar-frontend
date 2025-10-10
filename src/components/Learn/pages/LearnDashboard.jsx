@@ -55,26 +55,42 @@ const ChapterNavIcon = () => (
 );
 
 // Cute bouncing "START" badge used above the active node
-const StartBadge = () => (
+const StartBadge = ({ color = "#2C6DEF" }) => (
   <div className="absolute -top-12 left-1/2 -translate-x-1/2 z-30 select-none">
     <div className="relative">
-      <div className="px-3 py-1.5 rounded-xl bg-transparent text-blue-500 font-extrabold tracking-wider shadow-none ring-2 ring-blue-500 animate-bounce bg-white/0">
+      <div
+        className="px-3 py-1.5 rounded-xl font-extrabold tracking-wider shadow-none animate-bounce"
+        style={{
+          color: color,
+          background: "transparent",
+          borderWidth: 2,
+          borderStyle: "solid",
+          borderColor: color,
+        }}
+      >
         START
       </div>
-      <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-6 border-r-6 border-t-8 border-l-transparent border-r-transparent border-t-blue-500"></div>
+      <div
+        className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-0 h-0 border-l-6 border-r-6 border-t-8 border-l-transparent border-r-transparent"
+        style={{ borderTopColor: color }}
+      ></div>
     </div>
   </div>
 );
 
-const PathNode = ({ status, onClick, disabled, offset = 0 }) => {
+const PathNode = ({ status, onClick, disabled, offset = 0, color = "#2C6DEF", lightenFn, darkenFn }) => {
   const isCompleted = status === "completed";
   const isActive = status === "active";
   const iconColor = "text-white";
-  const nodeBg = isCompleted
-    ? "bg-gradient-to-br from-blue-400 to-blue-500"
+  const activeFrom = color;
+  const activeTo = darkenFn ? darkenFn(color, 0.15) : color;
+  const lockedFrom = lightenFn ? lightenFn(color, 0.55) : color;
+  const lockedTo = lightenFn ? lightenFn(color, 0.35) : color;
+  const nodeStyle = isCompleted
+    ? { background: "linear-gradient(135deg, #FACC15, #EAB308)" }
     : isActive
-    ? "bg-gradient-to-br from-blue-500 to-blue-700 animate-pulse"
-    : "bg-gradient-to-br from-blue-200 to-blue-300";
+    ? { background: `linear-gradient(135deg, ${activeFrom}, ${activeTo})`, animation: "pulse 2s infinite" }
+    : { background: `linear-gradient(135deg, ${lockedFrom}, ${lockedTo})` };
   const size = isActive
     ? "w-24 h-24 md:w-24 md:h-24"
     : "w-20 h-20 md:w-20 md:h-20";
@@ -85,11 +101,12 @@ const PathNode = ({ status, onClick, disabled, offset = 0 }) => {
     >
       <div
         onClick={disabled ? undefined : onClick}
-        className={`${size} rounded-full flex items-center justify-center shadow-[0_8px_0_0_rgba(0,0,0,0.15)] ${nodeBg} ${iconColor} ring-4 ring-white/70 ${
+        className={`${size} rounded-full flex items-center justify-center shadow-[0_8px_0_0_rgba(0,0,0,0.15)] ${iconColor} ring-4 ring-white/70 ${
           disabled
             ? "cursor-not-allowed"
             : "cursor-pointer hover:scale-110 transition-transform"
         }`}
+        style={nodeStyle}
       >
         <StarIcon />
       </div>
@@ -124,6 +141,88 @@ const LearnDashboard = ({ onboardingData }) => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Palette for per-unit theming
+  const unitPalette = ["#2C6DEF", "#58CC02", "#CE82FF", "#00CD9C"];
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+  const hexToRgb = (hex) => {
+    const h = hex.replace('#','');
+    const bigint = parseInt(h.length === 3 ? h.split('').map((c)=>c+c).join('') : h, 16);
+    return { r: (bigint >> 16) & 255, g: (bigint >> 8) & 255, b: bigint & 255 };
+  };
+  const rgbToHex = ({r,g,b}) => {
+    const toHex = (v) => v.toString(16).padStart(2,'0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  };
+  const lighten = (hex, amount = 0.25) => {
+    const { r, g, b } = hexToRgb(hex);
+    const rr = clamp(Math.round(r + (255 - r) * amount), 0, 255);
+    const gg = clamp(Math.round(g + (255 - g) * amount), 0, 255);
+    const bb = clamp(Math.round(b + (255 - b) * amount), 0, 255);
+    return rgbToHex({ r: rr, g: gg, b: bb });
+  };
+  const darken = (hex, amount = 0.15) => {
+    const { r, g, b } = hexToRgb(hex);
+    const rr = clamp(Math.round(r * (1 - amount)), 0, 255);
+    const gg = clamp(Math.round(g * (1 - amount)), 0, 255);
+    const bb = clamp(Math.round(b * (1 - amount)), 0, 255);
+    return rgbToHex({ r: rr, g: gg, b: bb });
+  };
+  const withAlpha = (hex, alpha = 0.6) => {
+    const { r, g, b } = hexToRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
+  // Helpers: local persistence for lesson completion
+  const userScopedKey = (base) => `${base}__${user?._id || 'anon'}`;
+  const LS_KEY_BASE = "lesson_progress_v1";
+  const LS_IDS_KEY_BASE = "lesson_completed_ids_v1";
+  const LS_KEY = userScopedKey(LS_KEY_BASE);
+  const USE_LOCAL_PROGRESS = false; // set true to enable client-side caching
+  const loadLocalProgress = () => {
+    if (!USE_LOCAL_PROGRESS) return {};
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (_) {
+      return {};
+    }
+  };
+  const saveLocalProgress = (data) => {
+    if (!USE_LOCAL_PROGRESS) return;
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(data));
+    } catch (_) {}
+  };
+  const markIndexCompletedLocal = (unitId, index) => {
+    if (!USE_LOCAL_PROGRESS) return;
+    const store = loadLocalProgress();
+    const key = unitId || "default";
+    const set = new Set(store[key] || []);
+    set.add(index);
+    store[key] = Array.from(set);
+    saveLocalProgress(store);
+  };
+  // Track completion by moduleId as well for robustness across ordering
+  const LS_IDS_KEY = userScopedKey(LS_IDS_KEY_BASE);
+  const loadCompletedIds = () => {
+    if (!USE_LOCAL_PROGRESS) return new Set();
+    try {
+      const raw = localStorage.getItem(LS_IDS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      return new Set(arr);
+    } catch (_) {
+      return new Set();
+    }
+  };
+  const addCompletedId = (moduleId) => {
+    if (!USE_LOCAL_PROGRESS) return;
+    try {
+      const set = loadCompletedIds();
+      if (moduleId) set.add(String(moduleId));
+      localStorage.setItem(LS_IDS_KEY, JSON.stringify(Array.from(set)));
+    } catch (_) {}
+  };
+
   // Pull subject/board from user or onboardingData
   const selectedBoard = onboardingData?.board || user?.board || "CBSE";
   const subjectName = onboardingData?.subject || user?.subject || "Science";
@@ -134,10 +233,23 @@ const LearnDashboard = ({ onboardingData }) => {
       try {
         setIsLoading(true);
         if (user?._id) {
-          const svc = (await import("../../../services/authService.js"))
-            .default;
+          const svc = (await import("../../../services/authService.js")).default;
           const res = await svc.getProgress(user._id);
           setProgress(res.data || []);
+          // mirror server progress into local storage as indexes by chapter (1-based)
+          if (USE_LOCAL_PROGRESS) {
+            try {
+              const local = loadLocalProgress();
+              const completedIdx = (res.data || [])
+                .filter((p) => p?.conceptCompleted)
+                .map((p) => (p?.chapter ? p.chapter - 1 : null))
+                .filter((n) => Number.isInteger(n));
+              const key = "default";
+              const set = new Set([...(local[key] || []), ...completedIdx]);
+              local[key] = Array.from(set);
+              saveLocalProgress(local);
+            } catch (_) {}
+          }
         }
         // Load chapter & module titles from curriculum API using user selections
         const cur = (await import("../../../services/curriculumService.js"))
@@ -280,6 +392,13 @@ const LearnDashboard = ({ onboardingData }) => {
   const handleLogout = () => {
     try {
       localStorage.removeItem("learnOnboarded");
+      // Clear user-scoped cached progress on logout
+      if (USE_LOCAL_PROGRESS) {
+        try {
+          localStorage.removeItem(userScopedKey(LS_KEY_BASE));
+          localStorage.removeItem(userScopedKey(LS_IDS_KEY_BASE));
+        } catch (_) {}
+      }
     } catch (_) {}
     logout?.();
     try {
@@ -288,10 +407,17 @@ const LearnDashboard = ({ onboardingData }) => {
   };
 
   const levels = modulesList;
-  const firstIncompleteIndex = levels.findIndex((_, i) => {
-    const ch = progress.find((p) => p.chapter === i + 1);
-    return !(ch && ch.conceptCompleted);
-  });
+  const serverCompletedSet = new Set(
+    (progress || [])
+      .filter((p) => p?.conceptCompleted)
+      .map((p) => (p?.chapter ? p.chapter - 1 : -1))
+      .filter((i) => i >= 0)
+  );
+  const localProgress = loadLocalProgress();
+  const completedIdSet = loadCompletedIds();
+
+  // Note: firstIncompleteIndex will be computed per unit to reflect local/module-id completion
+  const firstIncompleteIndex = levels.findIndex((_, i) => !serverCompletedSet.has(i));
 
   const amplitude = 30;
   const nodesCount = levels.length + 1; // modules + revision node
@@ -468,7 +594,9 @@ const LearnDashboard = ({ onboardingData }) => {
                         className="relative pt-12 pb-28"
                       >
                          {/* Unit header card - sticky until next unit */}
-                         <div className="sticky top-0 z-30 bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-5 rounded-3xl flex justify-between items-center mb-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] max-w-3xl mx-auto">
+                         {(() => { const color = unitPalette[unitIdx % unitPalette.length]; const gradFrom = color; const gradTo = darken(color, 0.15); return (
+                         <div className="sticky top-0 z-30 text-white px-6 py-5 rounded-3xl flex justify-between items-center mb-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] max-w-3xl mx-auto border-4"
+                              style={{ background: `linear-gradient(90deg, ${gradFrom}, ${gradTo})`, borderColor: withAlpha(color, 0.25) }}>
                            <div>
                              <p className="font-extrabold text-xl md:text-2xl">
                                {u.title || unitTitle || `Unit ${unitIdx + 1}`}
@@ -494,21 +622,36 @@ const LearnDashboard = ({ onboardingData }) => {
                              </button>
                            </div>
                          </div>
+                         ); })()}
                         {/* Center line for this unit */}
+                        {(() => { const color = unitPalette[unitIdx % unitPalette.length]; return (
                         <div
-                          className="absolute left-1/2 -translate-x-1/2 w-3 bg-blue-300 rounded-full z-20 shadow-[0_0_0_6px_rgba(255,255,255,0.5)]"
-                          style={{ top: 240, height: localLineHeight }}
-                        />
+                          className="absolute left-1/2 -translate-x-1/2 w-3 rounded-full z-20 shadow-[0_0_0_6px_rgba(255,255,255,0.5)]"
+                          style={{ top: 240, height: localLineHeight, backgroundColor: lighten(color, 0.5) }}
+                        /> ); })()}
                         <div className="relative flex flex-col items-center gap-24 pt-28 pb-8">
                           {localLevels.map((mod, index) => {
-                            const p = progress.find(
-                              (c) => c.chapter === index + 1
-                            );
+                            const p = progress.find((c) => c.chapter === index + 1);
+                            const moduleIdHere = unitMods[index]?._id;
+                            const localDoneByIndex = (localProgress[u?._id] || localProgress["default"] || []).includes(index);
+                            const localDoneById = moduleIdHere ? completedIdSet.has(String(moduleIdHere)) : false;
+                            // Compute per-unit first incomplete using module IDs
+                            const firstIncompleteForUnit = (() => {
+                              for (let i = 0; i < unitMods.length; i++) {
+                                const id = unitMods[i]?._id;
+                                const idxDone = (localProgress[u?._id] || localProgress["default"] || []).includes(i);
+                                const idDone = id ? completedIdSet.has(String(id)) : false;
+                                const serverDone = progress.find((c) => c.chapter === i + 1 && c.conceptCompleted);
+                                if (!(idxDone || idDone || serverDone)) return i;
+                              }
+                              return -1; // all completed -> no active star in this unit
+                            })();
                             let status = "locked";
-                            if (p && p.conceptCompleted) status = "completed";
-                            else if (index === 0) status = "active";
+                            if ((p && p.conceptCompleted) || localDoneByIndex || localDoneById) status = "completed";
+                            else if (index === firstIncompleteForUnit) status = "active";
                             const canClick = true; // allow opening any module; adjust when per-module progress exists
                             const alignRight = index % 2 === 1;
+                            const railColor = lighten(unitPalette[unitIdx % unitPalette.length], 0.45);
                             return (
                               <div
                                 key={index}
@@ -520,20 +663,24 @@ const LearnDashboard = ({ onboardingData }) => {
                                 {alignRight ? (
                                   <div className="absolute left-1/2 top-1/2 -translate-y-1/2 w-1/2">
                                     <div className="flex items-center">
-                                      <div className="h-2 md:h-3 bg-blue-300 w-28 md:w-36 rounded-full"></div>
+                                      <div className="h-2 md:h-3 w-28 md:w-36 rounded-full" style={{ backgroundColor: railColor }}></div>
                                       <div className="relative">
-                                        {status === "active" && <StartBadge />}
+                                        {status === "active" && <StartBadge color={unitPalette[unitIdx % unitPalette.length]} />}
                                         <PathNode
                                           status={status}
                                           disabled={!canClick}
+                                          color={unitPalette[unitIdx % unitPalette.length]}
+                                          lightenFn={lighten}
+                                          darkenFn={darken}
                                           onClick={() => {
                                             if (!canClick) return;
-                                            const moduleId =
-                                              modulesList[index]?._id;
-                                            if (moduleId)
-                                              navigate(
-                                                `/learn/module/${moduleId}`
-                                              );
+                                            const moduleId = modulesList[index]?._id;
+                                            if (moduleId) navigate(`/learn/module/${moduleId}`);
+                                            // optimistically mark active as completed locally (can be adjusted when real completion event fires)
+                                            if (status === "active") {
+                                              markIndexCompletedLocal(u?._id, index);
+                                              addCompletedId(moduleId);
+                                            }
                                           }}
                                         />
                                       </div>
@@ -543,33 +690,32 @@ const LearnDashboard = ({ onboardingData }) => {
                                   <div className="absolute right-1/2 top-1/2 -translate-y-1/2 w-1/2">
                                     <div className="flex items-center justify-end">
                                       <div className="relative">
-                                        {status === "active" && <StartBadge />}
+                                        {status === "active" && <StartBadge color={unitPalette[unitIdx % unitPalette.length]} />}
                                         <PathNode
                                           status={status}
                                           disabled={!canClick}
+                                          color={unitPalette[unitIdx % unitPalette.length]}
+                                          lightenFn={lighten}
+                                          darkenFn={darken}
                                           onClick={() => {
                                             if (!canClick) return;
-                                            const moduleId =
-                                              unitMods[index]?._id;
-                                            if (moduleId)
-                                              navigate(
-                                                `/learn/module/${moduleId}`
-                                              );
+                                            const moduleId = unitMods[index]?._id;
+                                            if (moduleId) navigate(`/learn/module/${moduleId}`);
+                                            if (status === "active") {
+                                              markIndexCompletedLocal(u?._id, index);
+                                              addCompletedId(moduleId);
+                                            }
                                           }}
                                         />
                                       </div>
-                                      <div className="h-2 md:h-3 bg-blue-300 w-28 md:w-36 rounded-full"></div>
+                                      <div className="h-2 md:h-3 w-28 md:w-36 rounded-full" style={{ backgroundColor: railColor }}></div>
                                     </div>
                                   </div>
                                 )}
                                 {/* Tooltip (hover only with smooth transition) - placed below the star */}
                                 <div
-                                  className={`absolute ${
-                                    alignRight ? "left-[62%]" : "right-[62%]"
-                                  } top-full mt-4 bg-white border-4 border-blue-600 rounded-[24px] shadow-xl px-7 py-5 w-80 hidden md:block transition-all duration-500 ease-out ${
-                                    hoveredIndex === index
-                                      ? "opacity-100"
-                                      : "opacity-0 pointer-events-none"
+                                  className={`absolute ${alignRight ? "left-[62%]" : "right-[62%]"} top-full mt-4 bg-white border-4 border-blue-600 rounded-[24px] shadow-xl px-7 py-5 w-80 hidden md:block transition-all duration-500 ease-out ${
+                                    hoveredIndex === index ? "opacity-100" : "opacity-0 pointer-events-none"
                                   }`}
                                   style={{ zIndex: 40 }}
                                 >
@@ -588,17 +734,19 @@ const LearnDashboard = ({ onboardingData }) => {
                               </div>
                             );
                           })}
-                          {/* Revision star below modules, connected to center line and on alternate side of first module */}
+                          {/* Revision star below modules, connected to center line and on alternate side of last module */}
                           {(() => {
-                            const firstAlignRight = 0 % 2 === 1; // alignment of first module node
-                            const starAlignRight = !firstAlignRight; // opposite side
+                            const lastIndex = Math.max(0, localLevels.length - 1);
+                            const lastAlignRight = lastIndex % 2 === 1; // true if last node is on the right
+                            const starAlignRight = !lastAlignRight; // place revision star opposite the last node
+                            const railColor = lighten(unitPalette[unitIdx % unitPalette.length], 0.55);
                             return (
                               <div className="relative w-full h-28">
                                 {starAlignRight ? (
                                   <div className="absolute left-1/2 top-1/2 -translate-y-1/2 w-1/2 flex items-center">
                                     <div
-                                      className="h-2 md:h-3 bg-blue-300/60 rounded-full"
-                                      style={{ width: `calc(50% - 90px)` }}
+                                      className="h-2 md:h-3 rounded-full"
+                                      style={{ width: `calc(50% - 90px)`, backgroundColor: railColor, opacity: 0.8 }}
                                     ></div>
                                     <RevisionStar
                                       align="right"
@@ -614,8 +762,8 @@ const LearnDashboard = ({ onboardingData }) => {
                                       unitId={u?._id}
                                     />
                                     <div
-                                      className="h-2 md:h-3 bg-blue-300/60 rounded-full"
-                                      style={{ width: `calc(50% - 90px)` }}
+                                      className="h-2 md:h-3 rounded-full"
+                                      style={{ width: `calc(50% - 90px)`, backgroundColor: railColor, opacity: 0.8 }}
                                     ></div>
                                   </div>
                                 )}

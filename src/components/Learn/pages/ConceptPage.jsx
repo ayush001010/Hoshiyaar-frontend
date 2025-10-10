@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import ProgressBar from '../../ui/ProgressBar.jsx';
 import SimpleLoading from '../../ui/SimpleLoading.jsx';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -30,7 +30,7 @@ export default function ConceptPage() {
     }
   }
 
-  async function goNext() {
+  const goNext = useCallback(async () => {
     const nextIndex = index + 1;
     if (nextIndex >= items.length) {
       // Mark chapter completed and return
@@ -46,7 +46,19 @@ export default function ConceptPage() {
     const title = params.get('title');
     const suffix = title ? `?title=${encodeURIComponent(title)}` : '';
     navigate(`${routeForType(nextItem.type, nextIndex)}${suffix}`);
-  }
+  }, [index, items, user, moduleNumber, navigate]);
+
+  // Allow advancing with Enter key when the exit confirmation is not visible
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === 'Enter' && !showExitConfirm) {
+        event.preventDefault();
+        goNext();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [goNext, showExitConfirm]);
 
   if (loading) return <SimpleLoading />;
   if (error) return <div className="p-6 text-red-600">{error}</div>;

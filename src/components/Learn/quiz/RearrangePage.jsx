@@ -126,10 +126,10 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       if (!item) return;
       if (!showResult) {
         console.log('[REARRANGE] Submitting via Enter');
-        handleCheck();
+        handleSubmit();
       } else {
         console.log('[REARRANGE] Continuing via Enter');
-        goNext();
+        handleNext();
       }
     };
     window.addEventListener('keydown', onKey);

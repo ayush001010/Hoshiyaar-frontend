@@ -39,6 +39,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
 
   const correctAudio = useRef(null);
   const errorAudio = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     try {
@@ -59,6 +60,11 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
     setShowIncorrectModal(false);
     setHasAnsweredCorrectly(false);
     setShowTryAgainOption(false);
+    // Focus input on new question
+    const id = setTimeout(() => {
+      try { if (inputRef.current) inputRef.current.focus(); } catch (_) {}
+    }, 0);
+    return () => clearTimeout(id);
   }, [item, moduleNumber, index]);
 
   // Allow browser back
@@ -81,6 +87,13 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [item, showResult, userAnswer]);
+
+  // Keep caret in input when result is hidden
+  useEffect(() => {
+    if (!showResult) {
+      try { if (inputRef.current) inputRef.current.focus(); } catch (_) {}
+    }
+  }, [showResult]);
 
   function routeForType(type, idx) {
     switch (type) {
@@ -282,10 +295,12 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
         <div className="w-full max-w-3xl mb-6">
             <input
               type="text"
+              ref={inputRef}
               value={userAnswer}
               onChange={(e) => setUserAnswer(e.target.value)}
               placeholder="Type the full word here..."
               disabled={showResult}
+              autoFocus
               className={`w-full p-5 text-xl border-2 rounded-2xl font-bold transition-all ${
                 showResult
                   ? isCorrect

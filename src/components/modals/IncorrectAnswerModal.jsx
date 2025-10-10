@@ -9,14 +9,19 @@ export default function IncorrectAnswerModal({ isOpen, onClose, onContinue, onTr
       setTimeout(() => setIsVisible(true), 10);
       const onKey = (e) => {
         if (e.key !== 'Enter') return;
-        if (typeof onTryAgain === 'function') onTryAgain();
+        // Prefer Continue when provided, otherwise Try Again
+        if (typeof onContinue === 'function') {
+          onContinue();
+        } else if (typeof onTryAgain === 'function') {
+          onTryAgain();
+        }
       };
       window.addEventListener('keydown', onKey);
       return () => window.removeEventListener('keydown', onKey);
     } else {
       setIsVisible(false);
     }
-  }, [isOpen]);
+  }, [isOpen, onContinue, onTryAgain]);
 
   if (!isOpen) return null;
 
@@ -43,6 +48,14 @@ export default function IncorrectAnswerModal({ isOpen, onClose, onContinue, onTr
                 className="px-6 py-3 rounded-2xl text-white font-extrabold text-lg bg-orange-600 hover:bg-orange-700 transition-colors"
               >
                 Try Again
+              </button>
+            )}
+            {typeof onContinue === 'function' && (
+              <button
+                onClick={onContinue}
+                className="px-8 py-3 rounded-2xl text-white font-extrabold text-lg bg-green-600 hover:bg-green-700 transition-colors"
+              >
+                Continue
               </button>
             )}
           </div>

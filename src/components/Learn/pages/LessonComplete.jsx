@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useReview } from '../../../context/ReviewContext.jsx';
 import image07 from '../../../assets/images/image-07.png';
-import heroChar from '../../../assets/images/heroChar.png';
+import reattemptImg from '../../../assets/images/reattempt.png';
 import finishImg from '../../../assets/images/finish.png';
  
 const LessonComplete = () => {
@@ -41,7 +41,7 @@ const LessonComplete = () => {
         <>
           {/* Character + speech bubble */}
           <div className="mt-6 w-full max-w-3xl flex flex-col items-center">
-            <img src={heroChar} alt="Mascot" className="w-56 h-56 md:w-64 md:h-64 object-contain select-none" />
+            <img src={reattemptImg} alt="Reattempt" className="w-56 h-56 md:w-64 md:h-64 object-contain select-none" />
             <p className="mt-4 text-2xl md:text-4xl text-gray-900 font-extrabold">Let's correct the exercises you missed!</p>
           </div>
           <div className="mt-10 w-full max-w-2xl">
