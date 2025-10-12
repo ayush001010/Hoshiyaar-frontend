@@ -11,8 +11,9 @@ const curriculumService = {
   listSubjects(board = 'CBSE') {
     return axios.get(`${API}/api/curriculum/subjects`, { params: { board } });
   },
-  listChapters(board = 'CBSE', subject = 'Science') {
-    return axios.get(`${API}/api/curriculum/chapters`, { params: { board, subject } });
+  listChapters(board = 'CBSE', subject = 'Science', extraParams = {}) {
+    // extraParams can include { userId, classTitle }
+    return axios.get(`${API}/api/curriculum/chapters`, { params: { board, subject, ...(extraParams || {}) } });
   },
   listUnits(chapterId) {
     return axios.get(`${API}/api/curriculum/units`, { params: { chapterId } });

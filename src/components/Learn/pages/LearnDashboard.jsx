@@ -115,7 +115,7 @@ const PathNode = ({ status, onClick, disabled, offset = 0, color = "#2C6DEF", li
 };
 
 const LearnDashboard = ({ onboardingData }) => {
-  const { logout, user } = useAuth();
+  const { logout, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [progress, setProgress] = useState([]);
   const [chapterTitle, setChapterTitle] = useState("");
@@ -140,6 +140,7 @@ const LearnDashboard = ({ onboardingData }) => {
   const [streak, setStreak] = useState(1);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Palette for per-unit theming
   const unitPalette = ["#2C6DEF", "#58CC02", "#CE82FF", "#00CD9C"];
@@ -170,6 +171,21 @@ const LearnDashboard = ({ onboardingData }) => {
   const withAlpha = (hex, alpha = 0.6) => {
     const { r, g, b } = hexToRgb(hex);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
+  // Session cache for per-chapter unit modules to reduce re-fetch latency
+  const cacheKeyForChapter = (chapterId) => `unit_modules_cache_v1__${chapterId}`;
+  const loadUnitModulesCache = (chapterId) => {
+    try {
+      return JSON.parse(sessionStorage.getItem(cacheKeyForChapter(chapterId)) || "{}") || {};
+    } catch (_) {
+      return {};
+    }
+  };
+  const saveUnitModulesCache = (chapterId, map) => {
+    try {
+      sessionStorage.setItem(cacheKeyForChapter(chapterId), JSON.stringify(map || {}));
+    } catch (_) {}
   };
 
   // Helpers: local persistence for lesson completion
@@ -227,59 +243,254 @@ const LearnDashboard = ({ onboardingData }) => {
   const selectedBoard = onboardingData?.board || user?.board || "CBSE";
   const subjectName = onboardingData?.subject || user?.subject || "Science";
   const preferredChapterId = onboardingData?.chapter || user?.chapter || null;
+  
+  // State to track available boards/subjects for fallback
+  const [availableBoards, setAvailableBoards] = useState([]);
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  
+  // Immediate fallback for new users to prevent black page
+  const isNewUser = !user?.board && !user?.subject && !onboardingData?.board && !onboardingData?.subject;
+  const [showImmediateFallback, setShowImmediateFallback] = useState(false);
+
+  // Immediate fallback for new users to prevent black page
+  useEffect(() => {
+    if (!authLoading && isNewUser && unitsList.length === 0 && modulesList.length === 0) {
+      console.log('Dashboard: Showing immediate fallback for new user');
+      setShowImmediateFallback(true);
+      // Set immediate dummy content
+      const dummyChapter = {
+        _id: 'immediate-dummy-chapter',
+        title: 'Welcome to Learning!',
+        subjectId: null,
+        order: 1
+      };
+      const dummyModules = [
+        { _id: 'immediate-dummy-module-1', title: 'Getting Started', order: 1 },
+        { _id: 'immediate-dummy-module-2', title: 'First Lesson', order: 2 },
+        { _id: 'immediate-dummy-module-3', title: 'Practice Time', order: 3 }
+      ];
+      const dummyUnit = { _id: 'immediate-dummy-unit', title: 'Unit 1 (Welcome)', virtual: true };
+      
+      setChaptersList([dummyChapter]);
+      setUnitsList([dummyUnit]);
+      setModulesList(dummyModules);
+      setUnitModulesMap({ [dummyUnit._id]: dummyModules });
+      setChapterTitle(dummyChapter.title);
+      setUnitTitle(dummyUnit.title);
+      setModuleTitle(dummyModules[0].title);
+    }
+  }, [authLoading, isNewUser, unitsList.length, modulesList.length]);
 
   useEffect(() => {
+    // Defer data loading until auth state resolves to avoid fetching with wrong defaults
+    if (authLoading) return;
     const load = async () => {
       try {
         setIsLoading(true);
-        if (user?._id) {
-          const svc = (await import("../../../services/authService.js")).default;
-          const res = await svc.getProgress(user._id);
-          setProgress(res.data || []);
-          // mirror server progress into local storage as indexes by chapter (1-based)
-          if (USE_LOCAL_PROGRESS) {
-            try {
-              const local = loadLocalProgress();
-              const completedIdx = (res.data || [])
-                .filter((p) => p?.conceptCompleted)
-                .map((p) => (p?.chapter ? p.chapter - 1 : null))
-                .filter((n) => Number.isInteger(n));
-              const key = "default";
-              const set = new Set([...(local[key] || []), ...completedIdx]);
-              local[key] = Array.from(set);
-              saveLocalProgress(local);
-            } catch (_) {}
+        console.log('Dashboard: Starting load...', { 
+          user: user?._id, 
+          selectedBoard, 
+          subjectName, 
+          authLoading,
+          onboardingData 
+        });
+        // Import services concurrently and fetch progress + chapters in parallel
+        const [authMod, curMod] = await Promise.all([
+          import("../../../services/authService.js"),
+          import("../../../services/curriculumService.js"),
+        ]);
+        const svc = authMod.default;
+        const cur = curMod.default;
+        
+        // For new users without preferences, fetch available boards and subjects first
+        let finalBoard = selectedBoard;
+        let finalSubject = subjectName;
+        
+        // Check if user has no preferences (new user)
+        const isNewUser = !user?.board && !user?.subject && !onboardingData?.board && !onboardingData?.subject;
+        console.log('Dashboard: User preference check', { 
+          isNewUser, 
+          userBoard: user?.board, 
+          userSubject: user?.subject, 
+          onboardingBoard: onboardingData?.board, 
+          onboardingSubject: onboardingData?.subject 
+        });
+        
+        if (isNewUser) {
+          console.log('Dashboard: New user detected, fetching available options...');
+          try {
+            const [boardsResp, subjectsResp] = await Promise.all([
+              cur.listBoards(),
+              cur.listSubjects(selectedBoard)
+            ]);
+            const boards = boardsResp?.data || [];
+            const subjects = subjectsResp?.data || [];
+            console.log('Dashboard: Available options fetched', { boards: boards.length, subjects: subjects.length });
+            setAvailableBoards(boards);
+            setAvailableSubjects(subjects);
+            
+            // Use first available board and subject if defaults don't exist
+            if (boards.length > 0 && subjects.length > 0) {
+              finalBoard = boards[0].name;
+              finalSubject = subjects[0].name;
+              console.log('Dashboard: Using first available options', { finalBoard, finalSubject });
+            } else {
+              console.warn('Dashboard: No available boards or subjects found');
+            }
+          } catch (e) {
+            console.warn('Dashboard: Failed to fetch available options, using defaults', e);
           }
         }
-        // Load chapter & module titles from curriculum API using user selections
-        const cur = (await import("../../../services/curriculumService.js"))
-          .default;
-        const chaptersResp = await cur.listChapters(selectedBoard, subjectName);
-        const listCh = chaptersResp?.data || [];
+        
+        const [progressResp, chaptersResp] = await Promise.all([
+          user?._id ? svc.getProgress(user._id) : Promise.resolve({ data: [] }),
+          cur.listChapters(finalBoard, finalSubject, user?._id ? { userId: user._id } : {}),
+        ]);
+        console.log('Dashboard: API responses', { progressResp: progressResp?.data, chaptersResp: chaptersResp?.data });
+        const progressData = progressResp?.data || [];
+        setProgress(progressData);
+        if (USE_LOCAL_PROGRESS) {
+          try {
+            const local = loadLocalProgress();
+            const completedIdx = (progressData || [])
+              .filter((p) => p?.conceptCompleted)
+              .map((p) => (p?.chapter ? p.chapter - 1 : null))
+              .filter((n) => Number.isInteger(n));
+            const key = "default";
+            const set = new Set([...(local[key] || []), ...completedIdx]);
+            local[key] = Array.from(set);
+            saveLocalProgress(local);
+          } catch (_) {}
+        }
+        // Load chapter & module titles
+        
+        let listCh = chaptersResp?.data || [];
+        console.log('Dashboard: Chapters found', listCh);
+        
+        // If no chapters found, try other available options
+        if (listCh.length === 0) {
+          console.log('Dashboard: No chapters found, trying other available options...');
+          for (const board of availableBoards) {
+            for (const subject of availableSubjects) {
+              if (board.name !== finalBoard || subject.name !== finalSubject) {
+                try {
+                  const altChaptersResp = await cur.listChapters(board.name, subject.name);
+                  const altChapters = altChaptersResp?.data || [];
+                  if (altChapters.length > 0) {
+                    console.log('Dashboard: Found chapters with alternative options', { board: board.name, subject: subject.name, count: altChapters.length });
+                    listCh = altChapters;
+                    finalBoard = board.name;
+                    finalSubject = subject.name;
+                    break;
+                  }
+                } catch (e) {
+                  console.warn('Dashboard: Failed to fetch chapters for', board.name, subject.name, e);
+                }
+              }
+            }
+            if (listCh.length > 0) break;
+          }
+          
+          // If still no chapters, try to fetch any chapters without board/subject filter
+          if (listCh.length === 0) {
+            console.log('Dashboard: Still no chapters, trying to fetch any available chapters...');
+            try {
+              // Try to get chapters by fetching all and taking the first one
+              const allChaptersResp = await cur.listChapters('CBSE', 'Science');
+              const allChapters = allChaptersResp?.data || [];
+              if (allChapters.length > 0) {
+                console.log('Dashboard: Found chapters with fallback method', { count: allChapters.length });
+                listCh = allChapters;
+              }
+            } catch (e) {
+              console.warn('Dashboard: Fallback chapter fetch failed', e);
+            }
+          }
+        }
+        
+        // Final safety net: if still no chapters, create a dummy one to avoid empty state
+        if (listCh.length === 0) {
+          console.log('Dashboard: Creating dummy chapter to avoid empty state');
+          const dummyChapter = {
+            _id: 'dummy-chapter',
+            title: 'Welcome to Learning!',
+            subjectId: null,
+            order: 1
+          };
+          listCh = [dummyChapter];
+        }
+        
         setChaptersList(listCh);
         const params = new URLSearchParams(window.location.search);
         const preferId = params.get("chapterId") || preferredChapterId;
         const ch = preferId
           ? listCh.find((c) => c._id === preferId)
           : listCh[0];
+        console.log('Dashboard: Selected chapter', ch);
         if (ch) {
           setChapterTitle(ch.title);
           setChapterId(ch._id);
           // Resolve unit title (prefer last opened unit for this chapter)
           try {
             const unitsResp = await cur.listUnits(ch._id);
-            const units = unitsResp?.data || [];
-            setUnitsList(units);
-            // Fetch modules for ALL units to enable stacked timelines
-            const nextMap = {};
-            for (const u of units) {
-              try {
-                const mods = await cur.listModulesByUnit(u._id);
-                nextMap[u._id] = mods?.data || [];
-              } catch (_) {
-                nextMap[u._id] = [];
+            let units = unitsResp?.data || [];
+            console.log('Dashboard: Units found', units);
+            // If chapter has no explicit units but has modules, create a virtual unit to display modules
+            if (!units || units.length === 0) {
+              console.log('Dashboard: No units found, checking for chapter modules...');
+              const chapterMods = await cur.listModules(ch._id);
+              const list = chapterMods?.data || [];
+              console.log('Dashboard: Chapter modules found', list.length);
+              if (list.length > 0) {
+                const virtualUnit = { _id: `virtual-${ch._id}`, title: 'Unit 1 (Auto)', virtual: true };
+                units = [virtualUnit];
+                console.log('Dashboard: Created virtual unit', virtualUnit);
+                setUnitModulesMap({ [virtualUnit._id]: list });
+                console.log('Dashboard: Set unit modules map for virtual unit', { [virtualUnit._id]: list });
+              } else if (ch._id === 'dummy-chapter') {
+                // Create dummy modules for dummy chapter
+                console.log('Dashboard: Creating dummy modules for dummy chapter');
+                const dummyModules = [
+                  { _id: 'dummy-module-1', title: 'Getting Started', order: 1 },
+                  { _id: 'dummy-module-2', title: 'First Lesson', order: 2 },
+                  { _id: 'dummy-module-3', title: 'Practice Time', order: 3 }
+                ];
+                const virtualUnit = { _id: `virtual-${ch._id}`, title: 'Unit 1 (Welcome)', virtual: true };
+                units = [virtualUnit];
+                setUnitModulesMap({ [virtualUnit._id]: dummyModules });
+                setModulesList(dummyModules);
+                console.log('Dashboard: Created dummy modules', dummyModules);
               }
             }
+            setUnitsList(units);
+            // Use session cache and fetch only missing units in parallel
+            const cachedMap = loadUnitModulesCache(ch._id);
+            const missingUnits = units.filter((u) => !cachedMap[u._id]);
+            if (missingUnits.length > 0) {
+              const unitPromises = missingUnits.map((u) => {
+                // Skip fetching for virtual units as they already have modules set
+                if (u.virtual) {
+                  return Promise.resolve([u._id, cachedMap[u._id] || []]);
+                }
+                return cur
+                  .listModulesByUnit(u._id)
+                  .then((mods) => [u._id, mods?.data || []])
+                  .catch(() => [u._id, []]);
+              });
+              const unitResults = await Promise.all(unitPromises);
+              unitResults.forEach(([id, list]) => {
+                cachedMap[id] = list;
+              });
+              saveUnitModulesCache(ch._id, cachedMap);
+            }
+            const nextMap = cachedMap;
+            // Ensure virtual unit modules are included in the final map
+            units.forEach(u => {
+              if (u.virtual && !nextMap[u._id]) {
+                nextMap[u._id] = cachedMap[u._id] || [];
+              }
+            });
+            console.log('Dashboard: Modules map', nextMap);
             setUnitModulesMap(nextMap);
             let lastMap = {};
             try {
@@ -294,18 +505,42 @@ const LearnDashboard = ({ onboardingData }) => {
               lastMap?.[ch._id];
             const preferredUnit = units.find((u) => u?._id === preferredUnitId);
             const chosenUnit = preferredUnit || units[0];
+            console.log('Dashboard: Chosen unit', chosenUnit);
             if (chosenUnit?.title) setUnitTitle(chosenUnit.title);
-            // Load modules for chosen unit if available; otherwise fallback to chapter modules
-            if (chosenUnit?._id) {
-              const modsByUnit = await cur.listModulesByUnit(chosenUnit._id);
-              const list = modsByUnit?.data || [];
-              setModulesList(list);
-              if (list[0]) setModuleTitle(list[0].title);
+            // Use cached modules for chosen unit when available; otherwise fallback to chapter modules
+            const cachedChosen = chosenUnit ? nextMap[chosenUnit._id] || [] : [];
+            console.log('Dashboard: Chosen unit modules', cachedChosen);
+            if (cachedChosen.length > 0) {
+              setModulesList(cachedChosen);
+              if (cachedChosen[0]) setModuleTitle(cachedChosen[0].title);
             } else {
               const modules = await cur.listModules(ch._id);
               const list = modules?.data || [];
+              console.log('Dashboard: Fallback chapter modules', list);
               setModulesList(list);
               if (list[0]) setModuleTitle(list[0].title);
+            }
+            // Safety: if units exist but chosenList is empty and chapter modules are also empty, avoid blank state by picking any first non-empty unit list
+            if (units.length > 0 && (!modulesList || modulesList.length === 0)) {
+              const firstNonEmpty = units.map((u) => nextMap[u._id] || []).find((arr) => arr.length > 0) || [];
+              console.log('Dashboard: Safety check - firstNonEmpty', firstNonEmpty);
+              if (firstNonEmpty.length > 0) {
+                setModulesList(firstNonEmpty);
+                setModuleTitle(firstNonEmpty[0]?.title || "");
+                console.log('Dashboard: Set modules list from safety check', firstNonEmpty);
+              }
+            }
+            
+            // Final safety: If we still have no modules but have units, try to get modules from the first unit
+            if (units.length > 0 && (!modulesList || modulesList.length === 0)) {
+              const firstUnit = units[0];
+              const firstUnitModules = nextMap[firstUnit._id] || [];
+              console.log('Dashboard: Final safety check - firstUnitModules', firstUnitModules);
+              if (firstUnitModules.length > 0) {
+                setModulesList(firstUnitModules);
+                setModuleTitle(firstUnitModules[0]?.title || "");
+                console.log('Dashboard: Set modules list from final safety check', firstUnitModules);
+              }
             }
           } catch (_) {
             setUnitTitle("");
@@ -315,19 +550,37 @@ const LearnDashboard = ({ onboardingData }) => {
             if (list[0]) setModuleTitle(list[0].title);
           }
         }
+        console.log('Dashboard: Load complete', { 
+          unitsList: unitsList.length, 
+          modulesList: modulesList.length,
+          finalUnits: units,
+          finalModulesMap: nextMap
+        });
+        
+        // Clear immediate fallback if we loaded real data
+        if (showImmediateFallback && (units.length > 0 || modulesList.length > 0)) {
+          console.log('Dashboard: Clearing immediate fallback, real data loaded');
+          setShowImmediateFallback(false);
+        }
+        
+        // Small delay to ensure state updates are processed
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 100);
       } catch (e) {
         console.error("Error loading dashboard data:", e);
-      } finally {
+        // Ensure UI becomes interactive even on failure
         setIsLoading(false);
       }
     };
     load();
-  }, [user, selectedBoard, subjectName, preferredChapterId]);
+  }, [user, selectedBoard, subjectName, preferredChapterId, authLoading, onboardingData]);
 
   // When opening chapters grid, load per-chapter module counts and compute simple completion
   useEffect(() => {
     if (!showChapters || chaptersList.length === 0) return;
     let cancelled = false;
+    setStatsLoading(true);
     (async () => {
       try {
         const cur = (await import("../../../services/curriculumService.js"))
@@ -350,9 +603,11 @@ const LearnDashboard = ({ onboardingData }) => {
         }
         if (!cancelled) setChapterStats(nextStats);
       } catch (_) {}
+      if (!cancelled) setStatsLoading(false);
     })();
     return () => {
       cancelled = true;
+      setStatsLoading(false);
     };
   }, [showChapters, chaptersList, progress]);
 
@@ -470,8 +725,8 @@ const LearnDashboard = ({ onboardingData }) => {
           {/* Section Header (hide when viewing chapters list). If units exist, headers are shown per unit below, so hide this top one. */}
           
 
-          {/* Loading State */}
-          {isLoading && (
+          {/* Loading State - Only show if we have no content at all */}
+          {isLoading && unitsList.length === 0 && modulesList.length === 0 && (
             <div className="flex items-center justify-center h-[60vh]">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -483,7 +738,7 @@ const LearnDashboard = ({ onboardingData }) => {
           )}
 
           {/* Vertical timelines - stacked per unit (scroll to view more) */}
-          {!isLoading && (
+          {(!isLoading || (unitsList.length > 0 || modulesList.length > 0)) && (
             <div
               className={`${
                 showChapters ? "relative w-full" : "relative max-w-4xl"
@@ -503,6 +758,12 @@ const LearnDashboard = ({ onboardingData }) => {
                         ✕
                       </button>
                     </div>
+                    {statsLoading && (
+                      <div className="flex justify-center items-center py-10">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                        <span className="ml-3 font-extrabold">Loading chapter stats…</span>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 gap-6 max-h-[60vh] overflow-y-auto pr-1">
                       {chaptersList.map((ch) => (
                         <div
@@ -576,10 +837,154 @@ const LearnDashboard = ({ onboardingData }) => {
                 <>
                   {/* Center line (dynamic height) */}
                   {/* Render each unit block one after another */}
-                  {(unitsList.length
-                    ? unitsList
-                    : [{ _id: "default", title: unitTitle }]
-                  ).map((u, unitIdx) => {
+                  {isLoading ? (
+                    <div className="flex items-center justify-center h-[50vh]">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-blue-600 font-semibold text-lg">Loading units…</p>
+                      </div>
+                    </div>
+                  ) : (unitsList.length === 0 && modulesList.length === 0) ? (
+                    <div className="flex items-center justify-center h-[50vh]">
+                      <div className="text-center">
+                        <div className="text-6xl mb-4">📚</div>
+                        <p className="text-blue-600 font-semibold text-lg mb-2">
+                          No units found
+                        </p>
+                        <p className="text-gray-600">
+                          Check console for debug info
+                        </p>
+                      </div>
+                    </div>
+                  ) : unitsList.length === 0 && modulesList.length > 0 ? (
+                    <div className="relative pt-12 pb-28">
+                      {/* Unit header card for direct modules */}
+                      <div className="sticky top-0 z-30 text-white px-6 py-5 rounded-3xl flex justify-between items-center mb-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] max-w-3xl mx-auto border-4"
+                           style={{ background: `linear-gradient(90deg, #2C6DEF, #1E4A8C)`, borderColor: 'rgba(44, 109, 239, 0.25)' }}>
+                        <div>
+                          <p className="font-extrabold text-xl md:text-2xl">
+                            {chapterTitle || 'Learning Modules'}
+                          </p>
+                          <p className="opacity-95 text-base md:text-lg">
+                            {subjectName}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => setShowChapters(true)} 
+                            className="flex items-center gap-3 py-3 px-5 rounded-2xl bg-white/15 hover:bg-white/25 transition-colors ring-2 ring-white/40 text-lg"
+                          >
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/20">
+                              <ChapterNavIcon />
+                            </span>
+                            <span className="font-bold hidden sm:inline">All Chapters</span>
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Render modules directly */}
+                      <div className="relative flex flex-col items-center gap-24 pt-28 pb-8">
+                        {modulesList.map((mod, index) => {
+                          const p = progress.find((c) => c.chapter === index + 1);
+                          const moduleIdHere = mod?._id;
+                          const localDoneByIndex = (localProgress["default"] || []).includes(index);
+                          const localDoneById = moduleIdHere ? completedIdSet.has(String(moduleIdHere)) : false;
+                          const firstIncompleteForUnit = modulesList.findIndex((_, i) => {
+                            const id = modulesList[i]?._id;
+                            const idxDone = (localProgress["default"] || []).includes(i);
+                            const idDone = id ? completedIdSet.has(String(id)) : false;
+                            const serverDone = progress.find((c) => c.chapter === i + 1 && c.conceptCompleted);
+                            return !(idxDone || idDone || serverDone);
+                          });
+                          let status = "locked";
+                          if ((p && p.conceptCompleted) || localDoneByIndex || localDoneById) status = "completed";
+                          else if (index === firstIncompleteForUnit) status = "active";
+                          const canClick = true;
+                          const alignRight = index % 2 === 1;
+                          const railColor = lighten("#2C6DEF", 0.45);
+                          return (
+                            <div
+                              key={index}
+                              className="relative w-full flex items-center justify-center"
+                              onMouseEnter={() => setHoveredIndex(index)}
+                              onMouseLeave={() => setHoveredIndex(null)}
+                            >
+                              {/* Connector + Star Node (alternate left/right) */}
+                              {alignRight ? (
+                                <div className="absolute left-1/2 top-1/2 -translate-y-1/2 w-1/2">
+                                  <div className="flex items-center">
+                                    <div className="h-2 md:h-3 w-28 md:w-36 rounded-full" style={{ backgroundColor: railColor }}></div>
+                                    <div className="relative">
+                                      {status === "active" && <StartBadge color="#2C6DEF" />}
+                                      <PathNode
+                                        status={status}
+                                        disabled={!canClick}
+                                        color="#2C6DEF"
+                                        lightenFn={lighten}
+                                        darkenFn={darken}
+                                        onClick={() => {
+                                          if (!canClick) return;
+                                          const moduleId = modulesList[index]?._id;
+                                          if (moduleId) navigate(`/learn/module/${moduleId}`);
+                                          if (status === "active") {
+                                            markIndexCompletedLocal("default", index);
+                                            addCompletedId(moduleId);
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="absolute right-1/2 top-1/2 -translate-y-1/2 w-1/2">
+                                  <div className="flex items-center justify-end">
+                                    <div className="relative">
+                                      {status === "active" && <StartBadge color="#2C6DEF" />}
+                                      <PathNode
+                                        status={status}
+                                        disabled={!canClick}
+                                        color="#2C6DEF"
+                                        lightenFn={lighten}
+                                        darkenFn={darken}
+                                        onClick={() => {
+                                          if (!canClick) return;
+                                          const moduleId = modulesList[index]?._id;
+                                          if (moduleId) navigate(`/learn/module/${moduleId}`);
+                                          if (status === "active") {
+                                            markIndexCompletedLocal("default", index);
+                                            addCompletedId(moduleId);
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="h-2 md:h-3 w-28 md:w-36 rounded-full" style={{ backgroundColor: railColor }}></div>
+                                  </div>
+                                </div>
+                              )}
+                              {/* Tooltip */}
+                              <div
+                                className={`absolute ${alignRight ? "left-[62%]" : "right-[62%]"} top-full mt-4 bg-white border-4 border-blue-600 rounded-[24px] shadow-xl px-7 py-5 w-80 hidden md:block transition-all duration-500 ease-out ${
+                                  hoveredIndex === index ? "opacity-100" : "opacity-0 pointer-events-none"
+                                }`}
+                                style={{ zIndex: 40 }}
+                              >
+                                <div className="text-2xl font-extrabold mt-1 text-blue-700">
+                                  {modulesList[index]?.title || "—"}
+                                </div>
+                                <div className="text-xl font-semibold text-blue-700/80">
+                                  {chapterTitle || "—"}
+                                </div>
+                                <div className="text-base font-medium text-blue-700/60">
+                                  {subjectName || "—"}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                  unitsList.map((u, unitIdx) => {
                     const unitMods = unitModulesMap[u._id] || modulesList;
                     const localLevels = unitMods;
                     // Make the center line span from the first star to the revision star
@@ -599,7 +1004,7 @@ const LearnDashboard = ({ onboardingData }) => {
                               style={{ background: `linear-gradient(90deg, ${gradFrom}, ${gradTo})`, borderColor: withAlpha(color, 0.25) }}>
                            <div>
                              <p className="font-extrabold text-xl md:text-2xl">
-                               {u.title || unitTitle || `Unit ${unitIdx + 1}`}
+                               {u.title || `Unit ${unitIdx + 1}`}
                              </p>
                              {chapterTitle && (
                                <p className="opacity-95 text-base md:text-lg">
@@ -773,29 +1178,15 @@ const LearnDashboard = ({ onboardingData }) => {
                         </div>
                       </div>
                     );
-                  })}
+                  })
+                  )
+                  }
                 </>
               )}
             </div>
           )}
 
-          {/* No Data State */}
-          {!isLoading &&
-            !showChapters &&
-            unitsList.length === 0 &&
-            modulesList.length === 0 && (
-              <div className="flex items-center justify-center h-[60vh]">
-                <div className="text-center">
-                  <div className="text-6xl mb-4">📚</div>
-                  <p className="text-blue-600 font-semibold text-lg mb-2">
-                    No content available
-                  </p>
-                  <p className="text-gray-600">
-                    Please check your selections or try refreshing the page.
-                  </p>
-                </div>
-              </div>
-            )}
+          {/* No Data State removed per request */}
         </main>
 
         {/* Right Panel with Character */}
