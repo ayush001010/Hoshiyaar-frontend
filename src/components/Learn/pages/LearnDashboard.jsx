@@ -615,16 +615,16 @@ const LearnDashboard = ({ onboardingData }) => {
       try {
         const cur = (await import("../../../services/curriculumService.js"))
           .default;
+        const completedIds = loadCompletedIds();
         const nextStats = {};
         for (let i = 0; i < chaptersList.length; i++) {
           const ch = chaptersList[i];
           try {
             const mods = await cur.listModules(ch._id);
-            const total = (mods?.data || []).length || 0;
-            // Approximate completed using progress entries with chapter index
-            const completed = (progress || []).filter(
-              (p) => p?.chapter === i + 1 && p?.conceptCompleted
-            ).length;
+            const modList = mods?.data || [];
+            const total = modList.length || 0;
+            // Completed: count modules whose IDs are in local completed id set
+            const completed = modList.reduce((acc, m) => acc + (completedIds.has(String(m?._id)) ? 1 : 0), 0);
             nextStats[ch._id] = { total, completed };
           } catch (_) {
             nextStats[ch._id] = { total: 0, completed: 0 };
@@ -845,9 +845,7 @@ const LearnDashboard = ({ onboardingData }) => {
                 <div className="w-full px-4 md:px-8">
                   <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-3xl p-6 md:p-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] ring-4 ring-white/20 w-full">
                     <div className="flex items-center justify-between mb-4">
-                      <div className="text-xl font-extrabold opacity-95">
-                        SEE DETAILS
-                      </div>
+                      
                       <button
                         onClick={() => setShowChapters(false)}
                         className="text-white/90 hover:text-white text-2xl"
@@ -918,7 +916,7 @@ const LearnDashboard = ({ onboardingData }) => {
                             </div>
                           </div>
                           {/* Chapter illustration (right side) */}
-                          <div className="flex-shrink-0 pr-2">
+                          <div className="flex-shrink-0 pr-2 hidden md:block">
                             <img
                               src={chapterImg}
                               alt="Chapter"
@@ -1023,10 +1021,7 @@ const LearnDashboard = ({ onboardingData }) => {
                                           if (!canClick) return;
                                           const moduleId = modulesList[index]?._id;
                                           if (moduleId) navigate(`/learn/module/${moduleId}`);
-                                          if (status === "active") {
-                                            markIndexCompletedLocal("default", index);
-                                            addCompletedId(moduleId);
-                                          }
+                                          // Do NOT mark completed here; only count after module completion
                                         }}
                                       />
                                     </div>
@@ -1047,10 +1042,7 @@ const LearnDashboard = ({ onboardingData }) => {
                                           if (!canClick) return;
                                           const moduleId = modulesList[index]?._id;
                                           if (moduleId) navigate(`/learn/module/${moduleId}`);
-                                          if (status === "active") {
-                                            markIndexCompletedLocal("default", index);
-                                            addCompletedId(moduleId);
-                                          }
+                                          // Do NOT mark completed here; only count after module completion
                                         }}
                                       />
                                     </div>
