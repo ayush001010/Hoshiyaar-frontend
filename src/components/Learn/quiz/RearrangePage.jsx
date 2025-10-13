@@ -6,6 +6,7 @@ import IncorrectAnswerModal from '../../modals/IncorrectAnswerModal.jsx';
 import authService from '../../../services/authService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useReview } from '../../../context/ReviewContext.jsx';
+import { useStars, StarCounter } from '../../../context/StarsContext.jsx';
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useModuleItems } from '../../../hooks/useModuleItems';
@@ -27,6 +28,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
   const actualReviewMode = isReviewMode || isReviewModeFromUrl;
   const { user } = useAuth();
   const { add: addToReview, removeActive, requeueActive } = useReview();
+  const { addStars } = useStars();
   const [arrangedWords, setArrangedWords] = useState([]);
   const [availableWords, setAvailableWords] = useState([]);
   const [showResult, setShowResult] = useState(false);
@@ -247,6 +249,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       playCorrectSound();
       setHasAnsweredCorrectly(true);
       setShowTryAgainOption(false); // Hide try again when correct
+      addStars(actualReviewMode ? 10 : 5);
       
       if (actualReviewMode) {
         removeActive();
@@ -257,6 +260,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       // Immediate feedback and enqueue for review
       setShowTryAgainOption(false);
       setShowIncorrectModal(true);
+      if (!actualReviewMode) addStars(-2);
       const questionId = `${moduleNumber}_${index}_rearrange`;
       if (!actualReviewMode) {
         addToReview({ questionId, moduleNumber, index, type: 'rearrange' });
@@ -372,10 +376,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
             </div>
           )}
           
-          <div className="flex items-center gap-2 text-gray-700">
-            <span className="text-lg">❤️</span>
-            <span className="font-bold">5</span>
-          </div>
+          <StarCounter />
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import ProgressBar from '../../ui/ProgressBar.jsx';
+import { StarCounter } from '../../../context/StarsContext.jsx';
 import SimpleLoading from '../../ui/SimpleLoading.jsx';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useModuleItems } from '../../../hooks/useModuleItems';
@@ -78,10 +79,7 @@ export default function ConceptPage() {
         <div className="flex-1 mx-2 sm:mx-4">
           <ProgressBar currentIndex={index} total={items.length} />
         </div>
-        <div className="flex items-center gap-1 sm:gap-2 text-gray-700">
-          <span className="text-sm sm:text-lg">❤️</span>
-          <span className="font-bold text-sm sm:text-base">5</span>
-        </div>
+        <StarCounter />
       </div>
 
       {/* Main Content - responsive text and spacing */}

@@ -11,6 +11,7 @@ import { useModuleItems } from '../../../hooks/useModuleItems';
 import authService from '../../../services/authService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useReview } from '../../../context/ReviewContext.jsx';
+import { useStars, StarCounter } from '../../../context/StarsContext.jsx';
 // Inline feedback bar instead of modal
 
 export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
@@ -49,6 +50,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
   const actualReviewMode = isReviewMode || isReviewModeFromUrl;
   const { user } = useAuth();
   const { add: addToReview, removeActive, requeueActive } = useReview();
+  const { addStars } = useStars();
   const [feedback, setFeedback] = useState({ open: false, correct: false, expected: '' });
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [showResult, setShowResult] = useState(false);
@@ -152,6 +154,8 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
     if (correct) {
       setHasAnsweredCorrectly(true);
       setShowTryAgainOption(false); // Hide try again when correct
+      // scoring: +5 normally, +10 in revision
+      addStars(actualReviewMode ? 10 : 5);
       
       // If in review mode, notify and go back to module
       if (actualReviewMode) {
@@ -162,6 +166,8 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
       // Immediate feedback and enqueue for review
       setShowTryAgainOption(false);
       setShowIncorrectModal(true);
+      // scoring penalty
+      if (!actualReviewMode) addStars(-2);
       const questionId = `${moduleNumber}_${index}_multiple-choice`;
       if (!actualReviewMode) {
         addToReview({ questionId, moduleNumber, index, type: 'multiple-choice' });
@@ -285,10 +291,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
             </div>
           )}
           
-          <div className="flex items-center gap-1 sm:gap-2 text-gray-700">
-            <span className="text-sm sm:text-lg">❤️</span>
-            <span className="font-bold text-sm sm:text-base">5</span>
-          </div>
+          <StarCounter />
         </div>
       </div>
 

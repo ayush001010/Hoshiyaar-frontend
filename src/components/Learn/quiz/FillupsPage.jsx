@@ -5,6 +5,7 @@ import IncorrectAnswerModal from '../../modals/IncorrectAnswerModal.jsx';
 import authService from '../../../services/authService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useReview } from '../../../context/ReviewContext.jsx';
+import { useStars, StarCounter } from '../../../context/StarsContext.jsx';
 // Inline feedback bar instead of modal
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -26,6 +27,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
   const actualReviewMode = isReviewMode || isReviewModeFromUrl;
   const { user } = useAuth();
   const { add: addToReview, removeActive, requeueActive } = useReview();
+  const { addStars } = useStars();
   const [feedback, setFeedback] = useState({ open: false, correct: false, expected: '' });
   const [userAnswer, setUserAnswer] = useState('');
   const [showResult, setShowResult] = useState(false);
@@ -130,6 +132,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
     if (correct) {
       setHasAnsweredCorrectly(true);
       setShowTryAgainOption(false); // Hide try again when correct
+      addStars(actualReviewMode ? 10 : 5);
       
       if (actualReviewMode) {
         removeActive();
@@ -139,6 +142,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
       // Immediate feedback and enqueue for review
       setShowTryAgainOption(false);
       setShowIncorrectModal(true);
+      if (!actualReviewMode) addStars(-2);
       const questionId = `${moduleNumber}_${index}_fill-in-the-blank`;
       if (!actualReviewMode) {
         addToReview({ questionId, moduleNumber, index, type: 'fill-in-the-blank' });
@@ -255,10 +259,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
             </div>
           )}
           
-          <div className="flex items-center gap-1 sm:gap-2 text-gray-700">
-            <span className="text-sm sm:text-lg">❤️</span>
-            <span className="font-bold text-sm sm:text-base">5</span>
-          </div>
+          <StarCounter />
         </div>
       </div>
 
