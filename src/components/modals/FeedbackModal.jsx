@@ -36,9 +36,36 @@ export default function FeedbackModal({ open, correct, expectedText, onClose, on
           <div className="bg-gray-50 rounded-2xl p-4 mb-6 border-2 border-dashed border-gray-300">
             <div className="text-center">
               <p className="text-gray-600 text-sm mb-2">The correct answer is:</p>
-              <div className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold text-lg inline-block">
-                {expectedText}
-              </div>
+              {(() => {
+                // Check if expectedText is an image URL
+                const isImageUrl = typeof expectedText === 'string' && 
+                  (expectedText.startsWith('http') || expectedText.startsWith('https'));
+                
+                if (isImageUrl) {
+                  return (
+                    <div className="flex justify-center">
+                      <img 
+                        src={expectedText} 
+                        alt="Correct answer"
+                        className="w-24 h-24 object-contain rounded border border-gray-300 bg-white p-2"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'block';
+                        }}
+                      />
+                      <div className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold text-lg inline-block" style={{display: 'none'}}>
+                        Image failed to load
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold text-lg inline-block">
+                      {expectedText}
+                    </div>
+                  );
+                }
+              })()}
             </div>
           </div>
         )}

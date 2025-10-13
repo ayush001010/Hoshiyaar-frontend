@@ -10,7 +10,6 @@ const Signup = () => {
     age: '',
     username: '',
     name: '',
-    password: '',
     dateOfBirth: '',
     classLevel: '',
   });
@@ -54,7 +53,6 @@ const Signup = () => {
       const response = await authService.register({
         username: formData.username.trim(),
         name: formData.name,
-        password: formData.password,
         age: Number(formData.age),
         dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth) : null,
         classLevel: formData.classLevel || null,
@@ -127,32 +125,30 @@ const Signup = () => {
                 className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
               />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="date"
-                  name="dateOfBirth"
-                  value={formData.dateOfBirth}
-                  onChange={onChange}
-                  placeholder="Date of Birth"
-                  className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
-                />
-                <input
-                  type="text"
-                  name="classLevel"
-                  value={formData.classLevel}
-                  onChange={onChange}
-                  placeholder="Class"
-                  className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
-                />
+                <div className="text-left">
+                  <label className="text-sm text-gray-300 mb-2 block">Date of Birth</label>
+                  <input
+                    type="date"
+                    name="dateOfBirth"
+                    value={formData.dateOfBirth}
+                    onChange={onChange}
+                    placeholder="Date of Birth"
+                    className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+                    required
+                  />
+                </div>
+                <div className="text-left">
+                  <label className="text-sm text-gray-300 mb-2 block">Class</label>
+                  <input
+                    type="text"
+                    name="classLevel"
+                    value={formData.classLevel}
+                    onChange={onChange}
+                    placeholder="Class"
+                    className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+                  />
+                </div>
               </div>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={onChange}
-                placeholder="Password"
-                className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
-                required
-              />
               <button
                 type="submit"
                 disabled={usernameStatus.available === false || usernameStatus.checking}

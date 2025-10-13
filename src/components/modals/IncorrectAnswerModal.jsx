@@ -36,8 +36,34 @@ export default function IncorrectAnswerModal({ isOpen, onClose, onContinue, onTr
             <span className="text-2xl mr-3">✕</span>
             <div>
               <div className="text-xl font-extrabold text-gray-900">Incorrect answer</div>
-              <div className="text-gray-700">
-                Correct answer: <span className="font-semibold">{correctAnswer}</span>
+              <div className="text-gray-700 flex items-center gap-3">
+                <span>Correct answer:</span>
+                {(() => {
+                  // Check if correctAnswer is an image URL
+                  const isImageUrl = typeof correctAnswer === 'string' && 
+                    (correctAnswer.startsWith('http') || correctAnswer.startsWith('https'));
+                  
+                  if (isImageUrl) {
+                    return (
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={correctAnswer} 
+                          alt="Correct answer"
+                          className="w-16 h-16 object-contain rounded border border-gray-300"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'block';
+                          }}
+                        />
+                        <span className="text-sm text-gray-500" style={{display: 'none'}}>
+                          Image failed to load
+                        </span>
+                      </div>
+                    );
+                  } else {
+                    return <span className="font-semibold">{correctAnswer}</span>;
+                  }
+                })()}
               </div>
             </div>
           </div>

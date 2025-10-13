@@ -299,35 +299,58 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
           {item.question}
         </h2>
 
-        {(() => { const imgs = (item.images || []).filter(Boolean); if (imgs.length === 0 && item.imageUrl) imgs.push(item.imageUrl); return imgs.length > 0 ? (
-          <div className="w-full max-w-4xl mb-6 flex justify-center">
-            <div className="flex flex-wrap justify-center gap-5">
-              {((item.images && item.images.filter(Boolean)) || (item.imageUrl ? [item.imageUrl] : [])).slice(0,5).map((src, i) => (
-                <div key={i} className="border border-blue-300 rounded-2xl p-3 bg-white shadow-sm">
-                  <img src={src} alt={'mcq-'+i} className="h-80 w-64 object-contain rounded-xl" />
-                </div>
-              ))}
+        {(() => { 
+          // Check if options are image URLs - if so, don't show question images
+          const hasImageOptions = item.options?.some(opt => typeof opt === 'string' && (opt.startsWith('http') || opt.startsWith('https')));
+          if (hasImageOptions) return null;
+          
+          const imgs = (item.images || []).filter(Boolean); 
+          if (imgs.length === 0 && item.imageUrl) imgs.push(item.imageUrl); 
+          return imgs.length > 0 ? (
+            <div className="w-full max-w-4xl mb-6 flex justify-center">
+              <div className="flex flex-wrap justify-center gap-5">
+                {((item.images && item.images.filter(Boolean)) || (item.imageUrl ? [item.imageUrl] : [])).slice(0,5).map((src, i) => (
+                  <div key={i} className="border border-blue-300 rounded-2xl p-3 bg-white shadow-sm">
+                    <img src={src} alt={'mcq-'+i} className="h-80 w-64 object-contain rounded-xl" />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : null })()}
+          ) : null 
+        })()}
 
         {!showResult && (
-          <div className="w-full max-w-3xl grid grid-cols-1 gap-4 mb-8">
-            {item.options?.map((opt, idx) => {
-              const isSelected = selectedIndex === idx;
-              const isCorrectOption = String(opt).trim().toLowerCase() === item.answer.trim().toLowerCase();
-            let buttonClass = "p-5 rounded-2xl border-2 text-center text-xl font-bold transition-all duration-200 hover:scale-[1.01] ";
+          <div className="w-full max-w-4xl mb-8">
+            {(() => {
+              // Check if any options are image URLs
+              const hasImageOptions = item.options?.some(opt => typeof opt === 'string' && (opt.startsWith('http') || opt.startsWith('https')));
+              
+              // Use horizontal layout for image options, vertical for text options
+              const containerClass = hasImageOptions 
+                ? "grid grid-cols-1 md:grid-cols-3 gap-6" 
+                : "grid grid-cols-1 gap-4 max-w-3xl mx-auto";
+              
+              return (
+                <div className={containerClass}>
+                  {item.options?.map((opt, idx) => {
+                    const isSelected = selectedIndex === idx;
+                    const isCorrectOption = String(opt).trim().toLowerCase() === item.answer.trim().toLowerCase();
+                    const isImageUrl = typeof opt === 'string' && (opt.startsWith('http') || opt.startsWith('https'));
+                    
+                    let buttonClass = hasImageOptions 
+                      ? "p-4 rounded-2xl border-2 text-center transition-all duration-200 hover:scale-[1.02] " 
+                      : "p-4 rounded-2xl border-2 text-center transition-all duration-200 hover:scale-[1.01] w-full ";
               
               if (showResult) {
                 if (isSelected) {
-                  buttonClass += isCorrect ? "bg-green-200 border-green-400 text-green-900" : "bg-red-200 border-red-400 text-red-900";
+                  buttonClass += isCorrect ? "bg-green-200 border-green-400" : "bg-red-200 border-red-400";
                 } else if (isCorrectOption) {
-                  buttonClass += "bg-green-200 border-green-400 text-green-900";
+                  buttonClass += "bg-green-200 border-green-400";
                 } else {
-                  buttonClass += "bg-gray-100 border-gray-300 text-gray-600";
+                  buttonClass += "bg-gray-100 border-gray-300";
                 }
               } else {
-                  buttonClass += "bg-white border-gray-300 text-gray-700 hover:border-blue-400";
+                buttonClass += "bg-white border-gray-300 hover:border-blue-400";
               }
 
               return (
@@ -337,10 +360,123 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
                   className={buttonClass}
                   disabled={showResult}
                 >
-                <div className="text-xl">{opt}</div>
+                  {isImageUrl ? (
+                    <div className="flex flex-col items-center">
+                      <img 
+                        src={opt} 
+                        alt={`Option ${idx + 1}`}
+                        className="w-full h-48 object-contain rounded-lg mb-2"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'block';
+                        }}
+                      />
+                      <div className="text-sm text-gray-600 font-medium" style={{display: 'none'}}>
+                        Option {idx + 1}
+                      </div>
+                      <div className="text-lg font-semibold text-gray-700">
+                        Option {idx + 1}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xl font-bold text-gray-700">{opt}</div>
+                  )}
                 </button>
+                  );
+                })}
+                </div>
               );
-            })}
+            })()}
+          </div>
+        )}
+
+        {/* Show results when answered */}
+        {showResult && (
+          <div className="w-full max-w-4xl mb-8">
+            {(() => {
+              // Check if any options are image URLs
+              const hasImageOptions = item.options?.some(opt => typeof opt === 'string' && (opt.startsWith('http') || opt.startsWith('https')));
+              
+              // Use horizontal layout for image options, vertical for text options
+              const containerClass = hasImageOptions 
+                ? "grid grid-cols-1 md:grid-cols-3 gap-6" 
+                : "grid grid-cols-1 gap-4 max-w-3xl mx-auto";
+              
+              return (
+                <div className={containerClass}>
+                  {item.options?.map((opt, idx) => {
+                    const isSelected = selectedIndex === idx;
+                    const isCorrectOption = String(opt).trim().toLowerCase() === item.answer.trim().toLowerCase();
+                    const isImageUrl = typeof opt === 'string' && (opt.startsWith('http') || opt.startsWith('https'));
+                    
+                    let buttonClass = hasImageOptions 
+                      ? "p-4 rounded-2xl border-2 text-center transition-all duration-200 " 
+                      : "p-4 rounded-2xl border-2 text-center transition-all duration-200 w-full ";
+              
+              if (isSelected) {
+                buttonClass += isCorrect ? "bg-green-200 border-green-400" : "bg-red-200 border-red-400";
+              } else if (isCorrectOption) {
+                buttonClass += "bg-green-200 border-green-400";
+              } else {
+                buttonClass += "bg-gray-100 border-gray-300";
+              }
+
+              return (
+                <div
+                  key={idx}
+                  className={buttonClass}
+                >
+                  {isImageUrl ? (
+                    <div className="flex flex-col items-center">
+                      <img 
+                        src={opt} 
+                        alt={`Option ${idx + 1}`}
+                        className="w-full h-48 object-contain rounded-lg mb-2"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'block';
+                        }}
+                      />
+                      <div className="text-sm text-gray-600 font-medium" style={{display: 'none'}}>
+                        Option {idx + 1}
+                      </div>
+                      <div className="text-lg font-semibold text-gray-700 mb-2">
+                        Option {idx + 1}
+                      </div>
+                      {/* Show checkmark or X for selected/correct options */}
+                      <div>
+                        {isSelected && (
+                          <span className={`text-2xl ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                            {isCorrect ? '✓' : '✗'}
+                          </span>
+                        )}
+                        {!isSelected && isCorrectOption && (
+                          <span className="text-2xl text-green-600">✓</span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div className="text-xl font-bold text-gray-700">{opt}</div>
+                      {/* Show checkmark or X for selected/correct options */}
+                      <div>
+                        {isSelected && (
+                          <span className={`text-2xl ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                            {isCorrect ? '✓' : '✗'}
+                          </span>
+                        )}
+                        {!isSelected && isCorrectOption && (
+                          <span className="text-2xl text-green-600">✓</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                  );
+                })}
+                </div>
+              );
+            })()}
           </div>
         )}
         {/* No bottom continue button for MCQ; use the feedback bar's Continue */}

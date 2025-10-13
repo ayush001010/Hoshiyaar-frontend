@@ -8,7 +8,7 @@ import authService from '../../services/authService.js';
 const Login = () => {
   const [formData, setFormData] = useState({
     username: '',
-    password: '',
+    dateOfBirth: '',
   });
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -56,17 +56,17 @@ const Login = () => {
             className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
             required
           />
-          <div className="relative">
+          <div className="text-left">
+            <label className="text-sm text-gray-300 mb-2 block">Date of Birth</label>
             <input
-              type="password"
-              name="password"
-              value={formData.password}
+              type="date"
+              name="dateOfBirth"
+              value={formData.dateOfBirth}
               onChange={onChange}
-              placeholder="Password"
+              placeholder="Date of Birth"
               className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
               required
             />
-            <a href="#" className="absolute right-4 top-1/2 -translate-y-1/2 text-duo-blue font-bold">FORGOT?</a>
           </div>
           <button type="submit" className="w-full bg-duo-blue text-white font-bold uppercase tracking-wider py-4 rounded-2xl border-b-4 border-duo-blue-dark hover:bg-blue-500 transition">
             Log In
