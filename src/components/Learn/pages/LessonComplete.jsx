@@ -15,6 +15,21 @@ const LessonComplete = () => {
     setIsChecking(false);
   }, []);
 
+  // Allow pressing Enter to trigger main CTA: Re-attempt when available, otherwise Continue Learning
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Enter') {
+        if (hasItems) {
+          navigate('/review-round');
+        } else {
+          navigate('/learn?go=dashboard');
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [hasItems, navigate]);
+
   
 
   const handleContinue = () => {

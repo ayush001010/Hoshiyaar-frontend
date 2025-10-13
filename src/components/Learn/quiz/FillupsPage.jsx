@@ -45,6 +45,8 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
     try {
       correctAudio.current = new Audio(correctSfx);
       errorAudio.current = new Audio(errorSfx);
+      if (correctAudio.current) correctAudio.current.volume = 1.0; // louder correct
+      if (errorAudio.current) errorAudio.current.volume = 0.4; // softer wrong
       correctAudio.current?.load?.();
       errorAudio.current?.load?.();
     } catch (_) {}
@@ -262,7 +264,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
 
       {/* Main Content - responsive text and spacing */}
       <div className="flex-1 flex flex-col items-center px-3 sm:px-4 md:px-6">
-        <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-extrabold text-gray-900 text-center mt-4 sm:mt-6 md:mt-8 mb-2 sm:mb-3 md:mb-4 text-overflow-fix px-2">
+        <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-gray-900 text-center mt-4 sm:mt-6 md:mt-8 mb-2 sm:mb-3 md:mb-4 text-overflow-fix px-2">
           {item.question}
         </h2>
 
@@ -273,17 +275,17 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
           const list = imgs.length > 0 ? imgs : primary;
           if (list.length === 0) {
             return (
-              <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl h-56 sm:h-72 md:h-96 rounded-2xl sm:rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center mb-2 sm:mb-3 md:mb-4">
+              <div className="w-full max-w-xl sm:max-w-2xl md:max-w-3xl h-40 sm:h-60 md:h-72 rounded-2xl sm:rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center mb-2 sm:mb-3 md:mb-4">
                 <span className="text-gray-400 text-sm sm:text-base">Image</span>
               </div>
             );
           }
           return (
-            <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mb-2 sm:mb-3 flex justify-center">
+            <div className="w-full max-w-xl sm:max-w-2xl md:max-w-3xl mb-2 sm:mb-3 flex justify-center">
               <div className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-5">
                 {list.slice(0, 5).map((src, i) => (
                   <div key={i} className="border border-blue-300 rounded-xl sm:rounded-2xl p-2 sm:p-3 bg-white shadow-sm">
-                    <img src={src} alt={`fillup-${i}`} className="h-32 w-24 sm:h-48 sm:w-36 md:h-64 md:w-48 lg:h-80 lg:w-64 object-contain rounded-lg sm:rounded-xl" />
+                    <img src={src} alt={`fillup-${i}`} className="h-28 w-20 sm:h-40 sm:w-28 md:h-52 md:w-40 lg:h-64 lg:w-48 object-contain rounded-lg sm:rounded-xl" />
                   </div>
                 ))}
               </div>
@@ -301,7 +303,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
               placeholder="Type the full word here..."
               disabled={showResult}
               autoFocus
-              className={`w-full p-3 sm:p-4 md:p-5 text-sm sm:text-base md:text-lg lg:text-xl border-2 rounded-xl sm:rounded-2xl font-bold transition-all ${
+              className={`w-full p-3 sm:p-3.5 md:p-4 text-sm sm:text-sm md:text-base lg:text-lg border-2 rounded-xl sm:rounded-2xl font-bold transition-all ${
                 showResult
                   ? isCorrect
                     ? 'bg-green-100 border-green-500 text-green-800'

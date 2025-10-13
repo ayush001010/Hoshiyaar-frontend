@@ -50,9 +50,9 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
     correctAudioRef.current = new Audio(correctSound);
     wrongAudioRef.current = new Audio(wrongSound);
     
-    // Set volume levels (optional)
-    correctAudioRef.current.volume = 0.7;
-    wrongAudioRef.current.volume = 0.7;
+    // Set volume levels: louder correct, softer wrong
+    correctAudioRef.current.volume = 1.0;
+    wrongAudioRef.current.volume = 0.35;
     
     // Cleanup on unmount
     return () => {
@@ -396,9 +396,9 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
             }
             return (
               <div className="w-full rounded-3xl border-2 border-gray-200 bg-white flex items-center justify-center p-3">
-                <div className="flex flex-wrap justify-center gap-4">
+                <div className="flex flex-wrap justify-center gap-3">
                   {list.slice(0, 5).map((src, i) => (
-                    <img key={i} src={src} alt={`rearrange-${i}`} className="h-56 w-44 object-contain rounded-xl border" />
+                    <img key={i} src={src} alt={`rearrange-${i}`} className="h-44 w-36 md:h-52 md:w-40 object-contain rounded-xl border" />
                   ))}
                 </div>
               </div>
@@ -407,7 +407,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
 
           {/* Question + Arranged (Right) */}
           <div className="flex flex-col">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-6">{item.question}</h2>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-4 md:mb-6">{item.question}</h2>
             {/* Dotted placeholder lines */}
             <div className="space-y-4 mb-6">
               <div className="h-5 border-b-2 border-dotted border-gray-300"></div>
