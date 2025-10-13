@@ -154,6 +154,8 @@ const LearnDashboard = ({ onboardingData }) => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
+  // Track when the first fetch completes to avoid false "No units" while fetching
+  const [hasFetched, setHasFetched] = useState(false);
 
   // Palette for per-unit theming
   const unitPalette = ["#2C6DEF", "#58CC02", "#CE82FF", "#00CD9C"];
@@ -198,6 +200,21 @@ const LearnDashboard = ({ onboardingData }) => {
   const saveUnitModulesCache = (chapterId, map) => {
     try {
       sessionStorage.setItem(cacheKeyForChapter(chapterId), JSON.stringify(map || {}));
+    } catch (_) {}
+  };
+
+  // Cache units list per chapter to hydrate UI immediately
+  const unitsKeyForChapter = (chapterId) => `unit_list_cache_v1__${chapterId}`;
+  const loadUnitsCache = (chapterId) => {
+    try {
+      return JSON.parse(sessionStorage.getItem(unitsKeyForChapter(chapterId)) || "[]") || [];
+    } catch (_) {
+      return [];
+    }
+  };
+  const saveUnitsCache = (chapterId, units) => {
+    try {
+      sessionStorage.setItem(unitsKeyForChapter(chapterId), JSON.stringify(units || []));
     } catch (_) {}
   };
 
@@ -308,6 +325,7 @@ const LearnDashboard = ({ onboardingData }) => {
       setChapterTitle(dummyChapter.title);
       setUnitTitle(dummyUnit.title);
       setModuleTitle(dummyModules[0].title);
+      setIsLoading(false);
     }
   }, [authLoading, isNewUser, unitsList.length, modulesList.length]);
 
@@ -462,8 +480,17 @@ const LearnDashboard = ({ onboardingData }) => {
           setChapterId(ch._id);
           // Resolve unit title (prefer last opened unit for this chapter)
           try {
-            const unitsResp = await cur.listUnits(ch._id);
-            let units = unitsResp?.data || [];
+            // Hydrate units from cache immediately to render skeleton rails
+            let units = loadUnitsCache(ch._id);
+            if (Array.isArray(units) && units.length > 0) {
+              setUnitsList(units);
+            }
+            // Kick off network fetch with AbortController
+            const ac = new AbortController();
+            const unitsPromise = cur.listUnits(ch._id, { signal: ac.signal }).catch(() => ({ data: units || [] }));
+            const unitsResp = await unitsPromise;
+            units = unitsResp?.data || [];
+            if (units.length > 0) saveUnitsCache(ch._id, units);
             console.log('Dashboard: Units found', units);
             // If chapter has no explicit units but has modules, create a virtual unit to display modules
             if (!units || units.length === 0) {
@@ -493,27 +520,31 @@ const LearnDashboard = ({ onboardingData }) => {
               }
             }
             setUnitsList(units);
-            // Use session cache and fetch only missing units in parallel
+            // Use session cache immediately for modules map
             const cachedMap = loadUnitModulesCache(ch._id);
-            const missingUnits = units.filter((u) => !cachedMap[u._id]);
-            if (missingUnits.length > 0) {
-              const unitPromises = missingUnits.map((u) => {
-                // Skip fetching for virtual units as they already have modules set
-                if (u.virtual) {
-                  return Promise.resolve([u._id, cachedMap[u._id] || []]);
-                }
-                return cur
-                  .listModulesByUnit(u._id)
-                  .then((mods) => [u._id, mods?.data || []])
-                  .catch(() => [u._id, []]);
-              });
-              const unitResults = await Promise.all(unitPromises);
-              unitResults.forEach(([id, list]) => {
-                cachedMap[id] = list;
-              });
-              saveUnitModulesCache(ch._id, cachedMap);
-            }
-            const nextMap = cachedMap;
+            const nextMap = { ...cachedMap };
+            setUnitModulesMap((prev) => ({ ...nextMap }));
+
+            // Fetch each unit's modules in parallel and update state as they arrive
+            const fetchPerUnit = async (u) => {
+              if (u.virtual) return; // already set when virtual
+              try {
+                const resp = await cur.listModulesByUnit(u._id);
+                const list = resp?.data || [];
+                nextMap[u._id] = list;
+                setUnitModulesMap((prev) => {
+                  const updated = { ...(prev || {}), [u._id]: list };
+                  saveUnitModulesCache(ch._id, updated);
+                  return updated;
+                });
+              } catch (_) {
+                // Keep cached value on error
+              }
+            };
+            // Fire and forget; don't await all to allow progressive paint
+            try {
+              await Promise.allSettled(units.map(fetchPerUnit));
+            } catch (_) {}
             // Ensure virtual unit modules are included in the final map
             units.forEach(u => {
               if (u.virtual && !nextMap[u._id]) {
@@ -521,7 +552,7 @@ const LearnDashboard = ({ onboardingData }) => {
               }
             });
             console.log('Dashboard: Modules map', nextMap);
-            setUnitModulesMap(nextMap);
+            setUnitModulesMap((prev) => ({ ...(prev || {}), ...nextMap }));
             let lastMap = {};
             try {
               lastMap = JSON.parse(
@@ -593,14 +624,13 @@ const LearnDashboard = ({ onboardingData }) => {
           setShowImmediateFallback(false);
         }
         
-        // Small delay to ensure state updates are processed
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 100);
+        setIsLoading(false);
+        setHasFetched(true);
       } catch (e) {
         console.error("Error loading dashboard data:", e);
         // Ensure UI becomes interactive even on failure
         setIsLoading(false);
+        setHasFetched(true);
       }
     };
     load();
@@ -822,20 +852,12 @@ const LearnDashboard = ({ onboardingData }) => {
           {/* Section Header (hide when viewing chapters list). If units exist, headers are shown per unit below, so hide this top one. */}
           
 
-          {/* Loading State - Only show if we have no content at all */}
-          {isLoading && unitsList.length === 0 && modulesList.length === 0 && (
-            <div className="flex items-center justify-center h-[60vh]">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-blue-600 font-semibold text-lg">
-                  Loading your learning path...
-                </p>
-              </div>
-            </div>
-          )}
+        {/* Loading screen removed per request */}
 
           {/* Vertical timelines - stacked per unit (scroll to view more) */}
-          {(!isLoading || (unitsList.length > 0 || modulesList.length > 0)) && (
+          {(
+            unitsList.length > 0 || modulesList.length > 0 || true
+          ) && (
             <div
               className={`${
                 showChapters ? "relative w-full" : "relative max-w-4xl"
@@ -932,27 +954,10 @@ const LearnDashboard = ({ onboardingData }) => {
                 <>
                   {/* Center line (dynamic height) */}
                   {/* Render each unit block one after another */}
-                  {isLoading ? (
-                    <div className="flex items-center justify-center h-[50vh]">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-blue-600 font-semibold text-lg">Loading units…</p>
-                      </div>
-                    </div>
-                  ) : (unitsList.length === 0 && modulesList.length === 0) ? (
-                    <div className="flex items-center justify-center h-[50vh]">
-                      <div className="text-center">
-                        <div className="text-6xl mb-4">📚</div>
-                        <p className="text-blue-600 font-semibold text-lg mb-2">
-                          No units found
-                        </p>
-                        <p className="text-gray-600">
-                          Check console for debug info
-                        </p>
-                      </div>
-                    </div>
-                  ) : unitsList.length === 0 && modulesList.length > 0 ? (
-                    <div className="relative pt-12 pb-28">
+                  {(() => {
+                    if (unitsList.length === 0 && modulesList.length > 0) {
+                      return (
+                        <div className="relative pt-12 pb-28">
                       {/* Unit header card for direct modules */}
                       <div className="sticky top-0 z-30 text-white px-6 py-5 rounded-3xl flex justify-between items-center mb-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] max-w-3xl mx-auto border-4"
                            style={{ background: `linear-gradient(90deg, #2C6DEF, #1E4A8C)`, borderColor: 'rgba(44, 109, 239, 0.25)' }}>
@@ -1072,8 +1077,12 @@ const LearnDashboard = ({ onboardingData }) => {
                         })}
                       </div>
                     </div>
-                  ) : (
-                  unitsList.map((u, unitIdx) => {
+                      );
+                    }
+                    if (unitsList.length > 0) {
+                      return (
+                        <>
+                        {unitsList.map((u, unitIdx) => {
                     const unitMods = unitModulesMap[u._id] || modulesList;
                     const localLevels = unitMods;
                     // Make the center line span from the first star to the revision star
@@ -1263,9 +1272,44 @@ const LearnDashboard = ({ onboardingData }) => {
                         </div>
                       </div>
                     );
-                  })
-                  )
-                  }
+                  })}
+                        </>
+                      );
+                    }
+                    // Skeleton unit tree while nothing has loaded
+                    return (
+                      <div className="relative pt-12 pb-28">
+                        <div className="sticky top-0 z-30 text-white px-6 py-5 rounded-3xl flex justify-between items-center mb-8 shadow-[0_10px_0_0_rgba(0,0,0,0.15)] max-w-3xl mx-auto border-4 animate-pulse"
+                             style={{ background: `linear-gradient(90deg, #93C5FD, #60A5FA)`, borderColor: 'rgba(147, 197, 253, 0.35)' }}>
+                          <div>
+                            <p className="font-extrabold text-xl md:text-2xl">Loading unit…</p>
+                            <p className="opacity-90 text-sm md:text-base">Please wait</p>
+                          </div>
+                        </div>
+                        <div className="relative flex flex-col items-center gap-20 pt-24 pb-6 px-12">
+                          {[0,1,2,3,4].map((idx) => (
+                            <div key={idx} className="relative w-full flex items-center justify-center px-8">
+                              {idx % 2 === 1 ? (
+                                <div className="absolute left-1/2 top-1/2 -translate-y-1/2 w-1/2">
+                                  <div className="flex items-center">
+                                    <div className="h-2 w-32 rounded-full bg-blue-100" />
+                                    <div className="w-16 h-16 rounded-full bg-yellow-200 border-4 border-yellow-300 shadow ml-3" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="absolute right-1/2 top-1/2 -translate-y-1/2 w-1/2">
+                                  <div className="flex items-center justify-end">
+                                    <div className="w-16 h-16 rounded-full bg-yellow-200 border-4 border-yellow-300 shadow mr-3" />
+                                    <div className="h-2 w-32 rounded-full bg-blue-100" />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </div>
