@@ -408,11 +408,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
           {/* Question + Arranged (Right) */}
           <div className="flex flex-col">
             <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-4 md:mb-6">{item.question}</h2>
-            {/* Dotted placeholder lines */}
-            <div className="space-y-4 mb-6">
-              <div className="h-5 border-b-2 border-dotted border-gray-300"></div>
-              <div className="h-5 border-b-2 border-dotted border-gray-300 w-11/12"></div>
-            </div>
+            {/* Removed dotted placeholder lines to declutter UI */}
             {/* Arranged Words Area with in-box reset */}
             <div className="relative">
               <div
