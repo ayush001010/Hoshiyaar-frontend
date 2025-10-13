@@ -865,10 +865,10 @@ const LearnDashboard = ({ onboardingData }) => {
                       {chaptersList.map((ch) => (
                         <div
                           key={ch._id}
-                          className="w-full min-h-[240px] md:min-h-[260px] rounded-2xl p-6 md:p-8 bg-white text-blue-700 border-4 border-blue-200 shadow-[0_10px_0_0_rgba(0,0,0,0.10)] flex items-center gap-8"
+                          className="w-full min-h-[200px] md:min-h-[220px] rounded-2xl p-5 md:p-6 bg-white text-blue-700 border-4 border-blue-200 shadow-[0_10px_0_0_rgba(0,0,0,0.10)] flex items-center gap-6"
                         >
                           <div className="flex-1">
-                            <div className="text-2xl font-extrabold">
+                            <div className="text-xl md:text-2xl font-extrabold leading-tight">
                               {ch.title}
                             </div>
                             <div className="mt-3 h-3 bg-blue-100 rounded-full overflow-hidden">
@@ -903,7 +903,7 @@ const LearnDashboard = ({ onboardingData }) => {
                                 return `${st.completed} / ${st.total || "?"}`;
                               })()}
                             </div>
-                            <div className="mt-5">
+                            <div className="mt-4">
                               <button
                                 onClick={() => {
                                   setShowChapters(false);
@@ -911,7 +911,7 @@ const LearnDashboard = ({ onboardingData }) => {
                                     ch._id
                                   )}`;
                                 }}
-                                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-lg shadow-[0_8px_0_0_rgba(0,0,0,0.12)]"
+                                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm md:text-base shadow-[0_6px_0_0_rgba(0,0,0,0.12)]"
                               >
                                 CONTINUE
                               </button>
@@ -922,7 +922,7 @@ const LearnDashboard = ({ onboardingData }) => {
                             <img
                               src={chapterImg}
                               alt="Chapter"
-                              className="w-46 h-46 md:w-52 md:h-52 object-contain opacity-95"
+                              className="w-36 h-36 md:w-44 md:h-44 object-contain opacity-95"
                             />
                           </div>
                         </div>

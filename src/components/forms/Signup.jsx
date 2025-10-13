@@ -91,7 +91,7 @@ const Signup = () => {
                 type="button"
                 onClick={handleNext}
                 disabled={!formData.age}
-                className="w-full bg-[#2d3748] text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed font-bold uppercase tracking-wider py-3 sm:py-4 rounded-xl sm:rounded-2xl hover:bg-[#3a475c] transition btn-responsive"
+                className="w-full bg-[#1E65FA] text-gray-300 disabled:cursor-not-allowed font-bold uppercase tracking-wider py-3 sm:py-4 rounded-xl sm:rounded-2xl hover:bg-blue-500' transition btn-responsive"
               >
                 Next
                         </button>
