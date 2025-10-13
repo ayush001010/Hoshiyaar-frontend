@@ -89,13 +89,13 @@ export default function ConceptPage() {
 
         {/* Title and Text */}
         {item.title && (
-          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-extrabold text-gray-900 text-center mt-4 sm:mt-6 md:mt-8 text-overflow-fix px-2">
+          <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-extrabold text-gray-900 text-center mt-4 sm:mt-6 md:mt-8 text-overflow-fix px-2">
             {item.title}
           </h2>
         )}
         <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mt-4 sm:mt-6 md:mt-8 lg:mt-10">
           <p
-            className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-extrabold text-gray-900 leading-relaxed whitespace-pre-wrap text-center text-overflow-fix px-2"
+            className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-extrabold text-gray-900 leading-relaxed whitespace-pre-wrap text-center text-overflow-fix px-2"
             dangerouslySetInnerHTML={{ __html: String(item.text || item.content || '') }}
           />
         </div>
@@ -106,7 +106,7 @@ export default function ConceptPage() {
             <div className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-5">
               {((item.images && item.images.filter(Boolean)) || (item.imageUrl ? [item.imageUrl] : [])).slice(0,5).map((src, i) => (
                 <div key={i} className="border border-blue-300 rounded-xl sm:rounded-2xl p-2 sm:p-3 bg-white shadow-sm">
-                  <img src={src} alt={'concept-'+i} className="h-40 w-32 sm:h-56 sm:w-44 md:h-72 md:w-56 lg:h-96 lg:w-72 xl:h-[28rem] xl:w-[20rem] object-contain rounded-lg sm:rounded-xl" />
+                  <img src={src} alt={'concept-'+i} className="h-32 w-24 sm:h-48 sm:w-36 md:h-60 md:w-44 lg:h-80 lg:w-60 xl:h-[22rem] xl:w-[16rem] object-contain rounded-lg sm:rounded-xl" />
                 </div>
               ))}
             </div>
