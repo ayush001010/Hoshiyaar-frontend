@@ -6,11 +6,12 @@ import BackButton from '../ui/BackButton.jsx';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', board: '', classLevel: '', age: '', dateOfBirth: '' });
+  const [form, setForm] = useState({ username: '', name: '', email: '', phone: '', board: '', classLevel: '', age: '', dateOfBirth: '' });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [mascotSrc, setMascotSrc] = useState(heroChar);
+  const [usernameStatus, setUsernameStatus] = useState('');
 
   // Fetch user details from DB (ignore subject/chapter), fallback to 'Not Defined' where absent
   useEffect(() => {
@@ -20,6 +21,7 @@ export default function ProfilePage() {
         const res = await authService.getUser(user._id);
         const dbUser = res?.data || {};
         setForm({
+          username: (dbUser.username ?? ''),
           name: (dbUser.name ?? 'Not Defined'),
           email: (dbUser.email ?? 'Not Defined'),
           phone: (dbUser.phone ?? 'Not Defined'),
@@ -31,6 +33,7 @@ export default function ProfilePage() {
       } catch (_) {
         // Fallback to auth context if fetch fails
         setForm({
+          username: (user?.username ?? ''),
           name: (user?.name ?? 'Not Defined'),
           email: (user?.email ?? 'Not Defined'),
           phone: (user?.phone ?? 'Not Defined'),
@@ -64,6 +67,7 @@ export default function ProfilePage() {
       }
       await authService.updateProfile({
         userId: user._id,
+        username: form.username || undefined,
         board: form.board === 'Not Defined' ? null : form.board,
         subject: user.subject,
         chapter: user.chapter,
@@ -100,6 +104,21 @@ export default function ProfilePage() {
         {/* Mascot */}
         <img src={mascotSrc} alt="Mascot" className="hidden md:block absolute -right-4 bottom-2 w-44 h-44 object-contain opacity-95 pointer-events-none" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pr-0 md:pr-28">
+          <label className="block">
+            <span className="text-sm font-bold text-gray-700">Username</span>
+            <input placeholder={form.username || 'Choose a unique username'} value={form.username} onChange={async (e)=>{
+              const val = e.target.value;
+              update('username', val);
+              setUsernameStatus('');
+              try {
+                if (!val || val === user?.username) return;
+                const res = await authService.checkUsername(val);
+                setUsernameStatus(res?.data?.available ? 'available' : 'taken');
+              } catch (_) { setUsernameStatus(''); }
+            }} className="mt-1 w-full px-4 py-3 rounded-2xl border-2 border-blue-200 focus:outline-none focus:border-blue-400" />
+            {usernameStatus === 'taken' && (<div className="mt-1 text-xs font-semibold text-red-600">Username already taken</div>)}
+            {usernameStatus === 'available' && (<div className="mt-1 text-xs font-semibold text-green-600">Username available</div>)}
+          </label>
           <label className="block">
             <span className="text-sm font-bold text-gray-700">Name</span>
             <input placeholder={form.name || 'Not Defined'} value={form.name} onChange={e=>update('name', e.target.value)} className="mt-1 w-full px-4 py-3 rounded-2xl border-2 border-blue-200 focus:outline-none focus:border-blue-400" />

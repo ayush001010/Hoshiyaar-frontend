@@ -1178,11 +1178,7 @@ const LearnDashboard = ({ onboardingData }) => {
                                             if (!canClick) return;
                                             const moduleId = modulesList[index]?._id;
                                             if (moduleId) navigate(`/learn/module/${moduleId}`);
-                                            // optimistically mark active as completed locally (can be adjusted when real completion event fires)
-                                            if (status === "active") {
-                                              markIndexCompletedLocal(u?._id, index);
-                                              addCompletedId(moduleId);
-                                            }
+                                            // Do NOT mark completed here; only count after module completion
                                           }}
                                         />
                                       </div>
@@ -1203,10 +1199,7 @@ const LearnDashboard = ({ onboardingData }) => {
                                             if (!canClick) return;
                                             const moduleId = unitMods[index]?._id;
                                             if (moduleId) navigate(`/learn/module/${moduleId}`);
-                                            if (status === "active") {
-                                              markIndexCompletedLocal(u?._id, index);
-                                              addCompletedId(moduleId);
-                                            }
+                                            // Do NOT mark completed here; only count after module completion
                                           }}
                                         />
                                       </div>
@@ -1216,20 +1209,23 @@ const LearnDashboard = ({ onboardingData }) => {
                                 )}
                                 {/* Tooltip (hover only with smooth transition) - placed below the star */}
                                 <div
-                                  className={`absolute ${alignRight ? "left-[62%]" : "right-[62%]"} top-full mt-4 bg-white border-2 border-blue-600 rounded-xl shadow-lg px-4 py-3 w-64 hidden md:block transition-all duration-500 ease-out ${
+                                  className={`absolute ${alignRight ? "left-[62%]" : "right-[62%]"} top-full mt-4 rounded-xl shadow-lg px-4 py-3 w-64 hidden md:block transition-all duration-500 ease-out ${
                                     hoveredIndex === index ? "opacity-100" : "opacity-0 pointer-events-none"
                                   }`}
-                                  style={{ zIndex: 40 }}
+                                  style={{ zIndex: 40, background: `linear-gradient(135deg, ${withAlpha(unitPalette[unitIdx % unitPalette.length],0.08)}, #fff)`, borderWidth: 2, borderStyle: 'solid', borderColor: withAlpha(unitPalette[unitIdx % unitPalette.length], 0.6) }}
                                 >
-                                  <div className="text-lg font-extrabold mt-1 text-blue-700">
+                                  <div className="text-lg font-extrabold mt-1"
+                                       style={{ color: darken(unitPalette[unitIdx % unitPalette.length], 0.2) }}>
                                     {unitMods[index]?.title ||
                                       moduleTitle ||
                                       "—"}
                                   </div>
-                                  <div className="text-base font-semibold text-blue-700/80">
+                                  <div className="text-base font-semibold"
+                                       style={{ color: withAlpha(unitPalette[unitIdx % unitPalette.length], 0.85) }}>
                                     {u.title || unitTitle || "—"}
                                   </div>
-                                  <div className="text-sm font-medium text-blue-700/60">
+                                  <div className="text-sm font-medium"
+                                       style={{ color: withAlpha(unitPalette[unitIdx % unitPalette.length], 0.7) }}>
                                     {chapterTitle || "—"}
                                   </div>
                                 </div>
