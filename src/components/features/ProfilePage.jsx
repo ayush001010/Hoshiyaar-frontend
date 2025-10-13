@@ -89,9 +89,9 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#E6F2FF] to-[#F7FBFF] py-10 px-6 relative">
-      <BackButton className="fixed left-4 top-4" />
-      <div className="max-w-5xl mx-auto bg-white border-4 border-blue-200 rounded-3xl shadow-[0_12px_0_0_rgba(0,0,0,0.10)] p-8 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-[#E6F2FF] to-[#F7FBFF] py-4 px-6 relative">
+      <BackButton className="fixed left-6 top-6 z-10" />
+      <div className="max-w-4xl mx-auto bg-white border-2 border-blue-200 rounded-2xl shadow-lg p-6 sm:p-8 relative overflow-hidden mt-16">
         {/* Top row: Title and Logout */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-extrabold text-blue-700">Edit Profile</h1>

@@ -41,60 +41,39 @@ const Login = () => {
 
   return (
     <AuthLayout title="Log in" linkTo="/signup" linkText="Sign up">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold mb-8">Log in</h1>
+      <div className="text-center w-full max-w-sm sm:max-w-md">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">Log in</h1>
         
-        {error && <p className="bg-red-500 text-white p-3 rounded-md mb-4">{error}</p>}
+        {error && <p className="bg-red-500 text-white p-3 rounded-md mb-4 text-sm sm:text-base text-overflow-fix">{error}</p>}
 
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-3 sm:space-y-4">
           <input
             type="text"
             name="username"
             value={formData.username}
             onChange={onChange}
             placeholder="Username"
-            className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+            className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-xl sm:rounded-2xl p-3 sm:p-4 focus:outline-none focus:border-duo-blue text-sm sm:text-base"
             required
           />
           <div className="text-left">
-            <label className="text-sm text-gray-300 mb-2 block">Date of Birth</label>
+            <label className="text-xs sm:text-sm text-gray-300 mb-2 block">Date of Birth</label>
             <input
               type="date"
               name="dateOfBirth"
               value={formData.dateOfBirth}
               onChange={onChange}
               placeholder="Date of Birth"
-              className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+              className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-xl sm:rounded-2xl p-3 sm:p-4 focus:outline-none focus:border-duo-blue text-sm sm:text-base"
               required
             />
           </div>
-          <button type="submit" className="w-full bg-duo-blue text-white font-bold uppercase tracking-wider py-4 rounded-2xl border-b-4 border-duo-blue-dark hover:bg-blue-500 transition">
+          <button type="submit" className="w-full bg-duo-blue text-white font-bold uppercase tracking-wider py-3 sm:py-4 rounded-xl sm:rounded-2xl border-b-4 border-duo-blue-dark hover:bg-blue-500 transition btn-responsive">
             Log In
           </button>
         </form>
 
-        {/* <button
-          type="button"
-          onClick={() => navigate('/signup')}
-          className="w-full mt-3 bg-transparent text-duo-blue font-bold uppercase tracking-wider py-3 rounded-2xl border-2 border-duo-blue hover:bg-duo-blue hover:text-white transition"
-        >
-          Create Account
-        </button> */}
-
-        {/* <div className="my-6 text-gray-400">OR</div> */}
-
-        {/* <div className="space-y-4">
-          <button className="w-full flex items-center justify-center bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 hover:bg-[#4c4c4c] transition">
-            <GoogleIcon />
-            <span>Google</span>
-          </button>
-          <button className="w-full flex items-center justify-center bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 hover:bg-[#4c4c4c] transition">
-            <FacebookIcon />
-            <span>Facebook</span>
-          </button>
-        </div> */}
-
-        <p className="text-xs text-gray-400 mt-8">
+        <p className="text-xs sm:text-sm text-gray-400 mt-6 sm:mt-8 text-overflow-fix">
           By signing in to Hoshiyaar, you agree to our Terms and Privacy Policy.
         </p>
       </div>

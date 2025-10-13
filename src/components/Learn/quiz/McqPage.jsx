@@ -263,39 +263,39 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4">
+      <div className="flex items-center justify-between p-3 sm:p-4">
         {!actualReviewMode && (
           <button 
             onClick={() => setShowExitConfirm(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+            className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-sm sm:text-base"
           >
             ✕
           </button>
         )}
-        <div className="flex-1 mx-4">
+        <div className="flex-1 mx-2 sm:mx-4">
       <ProgressBar currentIndex={index} total={items.length} />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           
           {/* Show flagged status */}
           {isFlagged && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-green-700">
-              <span className="text-lg">✅</span>
-              <span className="text-sm font-medium">Marked for Review</span>
+            <div className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-green-50 border border-green-200 text-green-700">
+              <span className="text-sm sm:text-lg">✅</span>
+              <span className="text-xs sm:text-sm font-medium">Marked for Review</span>
             </div>
           )}
           
-          <div className="flex items-center gap-2 text-gray-700">
-            <span className="text-lg">❤️</span>
-            <span className="font-bold">5</span>
+          <div className="flex items-center gap-1 sm:gap-2 text-gray-700">
+            <span className="text-sm sm:text-lg">❤️</span>
+            <span className="font-bold text-sm sm:text-base">5</span>
           </div>
         </div>
       </div>
 
-      {/* Main Content - full-width white, image between question and options */}
-      <div className="flex-1 flex flex-col items-center px-6">
+      {/* Main Content - responsive text and spacing */}
+      <div className="flex-1 flex flex-col items-center px-3 sm:px-4 md:px-6">
 
-        <h2 className="text-3xl font-extrabold text-gray-900 text-center mt-8 mb-8">
+        <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-extrabold text-gray-900 text-center mt-4 sm:mt-6 md:mt-8 mb-2 sm:mb-3 md:mb-4 text-overflow-fix px-2">
           {item.question}
         </h2>
 
@@ -307,11 +307,11 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
           const imgs = (item.images || []).filter(Boolean); 
           if (imgs.length === 0 && item.imageUrl) imgs.push(item.imageUrl); 
           return imgs.length > 0 ? (
-            <div className="w-full max-w-4xl mb-6 flex justify-center">
-              <div className="flex flex-wrap justify-center gap-5">
+            <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mb-2 sm:mb-3 flex justify-center">
+              <div className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-5">
                 {((item.images && item.images.filter(Boolean)) || (item.imageUrl ? [item.imageUrl] : [])).slice(0,5).map((src, i) => (
-                  <div key={i} className="border border-blue-300 rounded-2xl p-3 bg-white shadow-sm">
-                    <img src={src} alt={'mcq-'+i} className="h-80 w-64 object-contain rounded-xl" />
+                  <div key={i} className="border border-blue-300 rounded-xl sm:rounded-2xl p-2 sm:p-3 bg-white shadow-sm">
+                    <img src={src} alt={'mcq-'+i} className="h-40 w-32 sm:h-56 sm:w-44 md:h-72 md:w-56 lg:h-96 lg:w-72 xl:h-[28rem] xl:w-[20rem] object-contain rounded-lg sm:rounded-xl" />
                   </div>
                 ))}
               </div>
@@ -320,15 +320,15 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
         })()}
 
         {!showResult && (
-          <div className="w-full max-w-4xl mb-8">
+          <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mb-3 sm:mb-4">
             {(() => {
               // Check if any options are image URLs
               const hasImageOptions = item.options?.some(opt => typeof opt === 'string' && (opt.startsWith('http') || opt.startsWith('https')));
               
               // Use horizontal layout for image options, vertical for text options
               const containerClass = hasImageOptions 
-                ? "grid grid-cols-1 md:grid-cols-3 gap-6" 
-                : "grid grid-cols-1 gap-4 max-w-3xl mx-auto";
+                ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6" 
+                : "grid grid-cols-1 gap-3 sm:gap-4 max-w-2xl sm:max-w-3xl mx-auto";
               
               return (
                 <div className={containerClass}>
@@ -338,8 +338,8 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
                     const isImageUrl = typeof opt === 'string' && (opt.startsWith('http') || opt.startsWith('https'));
                     
                     let buttonClass = hasImageOptions 
-                      ? "p-4 rounded-2xl border-2 text-center transition-all duration-200 hover:scale-[1.02] " 
-                      : "p-4 rounded-2xl border-2 text-center transition-all duration-200 hover:scale-[1.01] w-full ";
+                      ? "p-2 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl border-2 text-center transition-all duration-200 hover:scale-[1.02] " 
+                      : "p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 text-center transition-all duration-200 hover:scale-[1.01] w-full ";
               
               if (showResult) {
                 if (isSelected) {
@@ -365,21 +365,21 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
                       <img 
                         src={opt} 
                         alt={`Option ${idx + 1}`}
-                        className="w-full h-48 object-contain rounded-lg mb-2"
+                        className="w-full h-24 sm:h-32 md:h-40 lg:h-48 object-contain rounded-lg mb-1 sm:mb-2"
                         onError={(e) => {
                           e.target.style.display = 'none';
                           e.target.nextSibling.style.display = 'block';
                         }}
                       />
-                      <div className="text-sm text-gray-600 font-medium" style={{display: 'none'}}>
+                      <div className="text-xs sm:text-sm text-gray-600 font-medium" style={{display: 'none'}}>
                         Option {idx + 1}
                       </div>
-                      <div className="text-lg font-semibold text-gray-700">
+                      <div className="text-sm sm:text-base md:text-lg font-semibold text-gray-700">
                         Option {idx + 1}
                       </div>
                     </div>
                   ) : (
-                    <div className="text-xl font-bold text-gray-700">{opt}</div>
+                    <div className="text-sm sm:text-base md:text-lg lg:text-xl font-bold text-gray-700 text-overflow-fix">{opt}</div>
                   )}
                 </button>
                   );
@@ -392,7 +392,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
 
         {/* Show results when answered */}
         {showResult && (
-          <div className="w-full max-w-4xl mb-8">
+          <div className="w-full max-w-4xl mb-4">
             {(() => {
               // Check if any options are image URLs
               const hasImageOptions = item.options?.some(opt => typeof opt === 'string' && (opt.startsWith('http') || opt.startsWith('https')));
@@ -544,7 +544,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
       {/* Exit confirmation overlay */}
       {showExitConfirm && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center">
-          <div className="w-full max-w-3xl">
+          <div className="w-full max-w-md">
             <ConceptExitConfirm
               progress={Math.round(((index+1)/Math.max(1, items.length))*100)}
               onQuit={() => navigate('/learn')}

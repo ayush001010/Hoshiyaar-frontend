@@ -69,21 +69,21 @@ const Signup = () => {
 
     return (
     <AuthLayout title="Sign up" linkTo="/login" linkText="Log in">
-      <div className="text-center">
+      <div className="text-center w-full max-w-sm sm:max-w-md">
         {step === 1 ? (
           <div>
-            <h1 className="text-3xl font-bold mb-8">How old are you?</h1>
-            {error && <p className="bg-red-500 text-white p-3 rounded-md mb-4">{error}</p>}
-            <div className="space-y-4">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">How old are you?</h1>
+            {error && <p className="bg-red-500 text-white p-3 rounded-md mb-4 text-sm sm:text-base text-overflow-fix">{error}</p>}
+            <div className="space-y-3 sm:space-y-4">
               <input
                 type="number"
                 name="age"
                 value={formData.age}
                 onChange={onChange}
                 placeholder="Age"
-                className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+                className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-xl sm:rounded-2xl p-3 sm:p-4 focus:outline-none focus:border-duo-blue text-sm sm:text-base"
               />
-              <p className="text-xs text-gray-400 text-left">
+              <p className="text-xs sm:text-sm text-gray-400 text-left text-overflow-fix">
                 Providing your age helps us tailor the right learning experience. For more
                 details, please see our <span className="text-duo-blue font-bold">Privacy Policy</span>.
               </p>
@@ -91,7 +91,7 @@ const Signup = () => {
                 type="button"
                 onClick={handleNext}
                 disabled={!formData.age}
-                className="w-full bg-[#2d3748] text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed font-bold uppercase tracking-wider py-4 rounded-2xl hover:bg-[#3a475c] transition"
+                className="w-full bg-[#2d3748] text-gray-300 disabled:opacity-60 disabled:cursor-not-allowed font-bold uppercase tracking-wider py-3 sm:py-4 rounded-xl sm:rounded-2xl hover:bg-[#3a475c] transition btn-responsive"
               >
                 Next
                         </button>
@@ -99,16 +99,16 @@ const Signup = () => {
                     </div>
         ) : (
           <div>
-            <h1 className="text-3xl font-bold mb-8">Create your profile</h1>
-            {error && <p className="bg-red-500 text-white p-3 rounded-md mb-4">{error}</p>}
-            <form onSubmit={onSubmit} className="space-y-4">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">Create your profile</h1>
+            {error && <p className="bg-red-500 text-white p-3 rounded-md mb-4 text-sm sm:text-base text-overflow-fix">{error}</p>}
+            <form onSubmit={onSubmit} className="space-y-3 sm:space-y-4">
               <input
                 type="text"
                 name="username"
                 value={formData.username}
                 onChange={onChange}
                 placeholder="Username (unique)"
-                className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+                className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-xl sm:rounded-2xl p-3 sm:p-4 focus:outline-none focus:border-duo-blue text-sm sm:text-base"
                 required
               />
               {usernameStatus.message && (
@@ -122,41 +122,41 @@ const Signup = () => {
                 value={formData.name}
                 onChange={onChange}
                 placeholder="Name"
-                className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+                className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-xl sm:rounded-2xl p-3 sm:p-4 focus:outline-none focus:border-duo-blue text-sm sm:text-base"
               />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="text-left">
-                  <label className="text-sm text-gray-300 mb-2 block">Date of Birth</label>
+                  <label className="text-xs sm:text-sm text-gray-300 mb-2 block">Date of Birth</label>
                   <input
                     type="date"
                     name="dateOfBirth"
                     value={formData.dateOfBirth}
                     onChange={onChange}
                     placeholder="Date of Birth"
-                    className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+                    className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-xl sm:rounded-2xl p-3 sm:p-4 focus:outline-none focus:border-duo-blue text-sm sm:text-base"
                     required
                   />
                 </div>
                 <div className="text-left">
-                  <label className="text-sm text-gray-300 mb-2 block">Class</label>
+                  <label className="text-xs sm:text-sm text-gray-300 mb-2 block">Class</label>
                   <input
                     type="text"
                     name="classLevel"
                     value={formData.classLevel}
                     onChange={onChange}
                     placeholder="Class"
-                    className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-2xl p-4 focus:outline-none focus:border-duo-blue"
+                    className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-xl sm:rounded-2xl p-3 sm:p-4 focus:outline-none focus:border-duo-blue text-sm sm:text-base"
                   />
                 </div>
               </div>
               <button
                 type="submit"
                 disabled={usernameStatus.available === false || usernameStatus.checking}
-                className={`w-full text-white font-bold uppercase tracking-wider py-4 rounded-2xl border-b-4 transition ${usernameStatus.available === false || usernameStatus.checking ? 'bg-gray-500 border-gray-600 cursor-not-allowed' : 'bg-duo-blue border-duo-blue-dark hover:bg-blue-500'}`}
+                className={`w-full text-white font-bold uppercase tracking-wider py-3 sm:py-4 rounded-xl sm:rounded-2xl border-b-4 transition text-sm sm:text-base btn-responsive ${usernameStatus.available === false || usernameStatus.checking ? 'bg-gray-500 border-gray-600 cursor-not-allowed' : 'bg-duo-blue border-duo-blue-dark hover:bg-blue-500'}`}
               >
                 Create Account
                     </button>
-              <p className="text-xs text-gray-400 text-left">
+              <p className="text-xs sm:text-sm text-gray-400 text-left text-overflow-fix">
                 By creating an account, you agree to our <span className="text-duo-blue font-bold">Terms</span>
                 &nbsp;and <span className="text-duo-blue font-bold">Privacy Policy</span>.
               </p>

@@ -554,7 +554,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       {/* Exit confirmation overlay */}
       {showExitConfirm && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center">
-          <div className="w-full max-w-3xl">
+          <div className="w-full max-w-md">
             <ConceptExitConfirm
               progress={Math.round(((index+1)/Math.max(1, items.length))*100)}
               onQuit={() => navigate('/learn')}

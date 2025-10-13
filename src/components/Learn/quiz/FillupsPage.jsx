@@ -231,38 +231,38 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4">
+      <div className="flex items-center justify-between p-3 sm:p-4">
         {!actualReviewMode && (
           <button 
             onClick={() => setShowExitConfirm(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+            className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-sm sm:text-base"
           >
             ✕
           </button>
         )}
-        <div className="flex-1 mx-4">
+        <div className="flex-1 mx-2 sm:mx-4">
           <ProgressBar currentIndex={index} total={items.length} />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           
           {/* Show flagged status */}
           {isFlagged && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-green-700">
-              <span className="text-lg">✅</span>
-              <span className="text-sm font-medium">Marked for Review</span>
+            <div className="flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-2 rounded-lg bg-green-50 border border-green-200 text-green-700">
+              <span className="text-sm sm:text-lg">✅</span>
+              <span className="text-xs sm:text-sm font-medium">Marked for Review</span>
             </div>
           )}
           
-          <div className="flex items-center gap-2 text-gray-700">
-            <span className="text-lg">❤️</span>
-            <span className="font-bold">5</span>
+          <div className="flex items-center gap-1 sm:gap-2 text-gray-700">
+            <span className="text-sm sm:text-lg">❤️</span>
+            <span className="font-bold text-sm sm:text-base">5</span>
           </div>
         </div>
       </div>
 
-      {/* Main Content - full-width white, large text */}
-      <div className="flex-1 flex flex-col items-center px-6">
-        <h2 className="text-3xl font-extrabold text-gray-900 text-center mt-8 mb-8">
+      {/* Main Content - responsive text and spacing */}
+      <div className="flex-1 flex flex-col items-center px-3 sm:px-4 md:px-6">
+        <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-extrabold text-gray-900 text-center mt-4 sm:mt-6 md:mt-8 mb-2 sm:mb-3 md:mb-4 text-overflow-fix px-2">
           {item.question}
         </h2>
 
@@ -273,17 +273,17 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
           const list = imgs.length > 0 ? imgs : primary;
           if (list.length === 0) {
             return (
-              <div className="w-full max-w-4xl h-80 rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center mb-8">
-                <span className="text-gray-400">Image</span>
+              <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl h-56 sm:h-72 md:h-96 rounded-2xl sm:rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center mb-2 sm:mb-3 md:mb-4">
+                <span className="text-gray-400 text-sm sm:text-base">Image</span>
               </div>
             );
           }
           return (
-            <div className="w-full max-w-4xl mb-6 flex justify-center">
-              <div className="flex flex-wrap justify-center gap-5">
+            <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mb-2 sm:mb-3 flex justify-center">
+              <div className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-5">
                 {list.slice(0, 5).map((src, i) => (
-                  <div key={i} className="border border-blue-300 rounded-2xl p-3 bg-white shadow-sm">
-                    <img src={src} alt={`fillup-${i}`} className="h-80 w-64 object-contain rounded-xl" />
+                  <div key={i} className="border border-blue-300 rounded-xl sm:rounded-2xl p-2 sm:p-3 bg-white shadow-sm">
+                    <img src={src} alt={`fillup-${i}`} className="h-32 w-24 sm:h-48 sm:w-36 md:h-64 md:w-48 lg:h-80 lg:w-64 object-contain rounded-lg sm:rounded-xl" />
                   </div>
                 ))}
               </div>
@@ -292,7 +292,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
         })()}
 
         {/* Text Input for fill-in-the-blank */}
-        <div className="w-full max-w-3xl mb-6">
+        <div className="w-full max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl mb-2 sm:mb-3">
             <input
               type="text"
               ref={inputRef}
@@ -301,7 +301,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
               placeholder="Type the full word here..."
               disabled={showResult}
               autoFocus
-              className={`w-full p-5 text-xl border-2 rounded-2xl font-bold transition-all ${
+              className={`w-full p-3 sm:p-4 md:p-5 text-sm sm:text-base md:text-lg lg:text-xl border-2 rounded-xl sm:rounded-2xl font-bold transition-all ${
                 showResult
                   ? isCorrect
                     ? 'bg-green-100 border-green-500 text-green-800'
@@ -312,10 +312,10 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
           </div>
 
         {/* Bottom Continue Button */}
-        <div className="w-full max-w-3xl mt-auto mb-8">
+        <div className="w-full max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl mt-auto mb-4 sm:mb-6 md:mb-8">
           <button
             onClick={() => showResult ? handleNext() : handleSubmit()}
-            className="w-full py-5 rounded-2xl bg-blue-600 text-white font-extrabold text-xl"
+            className="w-full py-3 sm:py-4 md:py-5 rounded-xl sm:rounded-2xl bg-blue-600 text-white font-extrabold text-base sm:text-lg md:text-xl btn-responsive"
           >
             {showResult ? 'Continue' : 'Check'}
           </button>
@@ -383,7 +383,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
       {/* Exit confirmation overlay */}
       {showExitConfirm && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-center justify-center">
-          <div className="w-full max-w-3xl">
+          <div className="w-full max-w-md">
             <ConceptExitConfirm
               progress={Math.round(((index+1)/Math.max(1, items.length))*100)}
               onQuit={() => navigate('/learn')}

@@ -36,7 +36,7 @@ const ProfileIcon = () => (
 );
 const StarIcon = () => (
   <svg
-    className="w-8 h-8 md:w-10 md:h-10"
+    className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 lg:w-8 lg:h-8"
     viewBox="0 0 24 24"
     fill="currentColor"
   >
@@ -48,6 +48,18 @@ const BookIcon = () => (
     <path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"></path>
   </svg>
 );
+const HamburgerIcon = () => (
+  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path>
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
+  </svg>
+);
+
 const ChapterNavIcon = () => (
   <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
     <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path>
@@ -92,8 +104,8 @@ const PathNode = ({ status, onClick, disabled, offset = 0, color = "#2C6DEF", li
     ? { background: `linear-gradient(135deg, ${activeFrom}, ${activeTo})`, animation: "pulse 2s infinite" }
     : { background: `linear-gradient(135deg, ${lockedFrom}, ${lockedTo})` };
   const size = isActive
-    ? "w-24 h-24 md:w-24 md:h-24"
-    : "w-20 h-20 md:w-20 md:h-20";
+    ? "w-16 h-16 sm:w-18 sm:h-18 md:w-20 md:h-20 lg:w-24 lg:h-24"
+    : "w-14 h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 lg:w-20 lg:h-20";
   return (
     <div
       className="inline-flex items-center justify-center"
@@ -101,7 +113,7 @@ const PathNode = ({ status, onClick, disabled, offset = 0, color = "#2C6DEF", li
     >
       <div
         onClick={disabled ? undefined : onClick}
-        className={`${size} rounded-full flex items-center justify-center shadow-[0_8px_0_0_rgba(0,0,0,0.15)] ${iconColor} ring-4 ring-white/70 ${
+        className={`${size} rounded-full flex items-center justify-center shadow-[0_4px_0_0_rgba(0,0,0,0.15)] sm:shadow-[0_6px_0_0_rgba(0,0,0,0.15)] md:shadow-[0_8px_0_0_rgba(0,0,0,0.15)] ${iconColor} ring-2 sm:ring-3 md:ring-4 ring-white/70 ${
           disabled
             ? "cursor-not-allowed"
             : "cursor-pointer hover:scale-110 transition-transform"
@@ -129,6 +141,7 @@ const LearnDashboard = ({ onboardingData }) => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [showChapters, setShowChapters] = useState(false);
   const [chapterStats, setChapterStats] = useState({}); // { [chapterId]: { total, completed } }
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const tips = [
     "Short lessons win! Finish one star, then take a mini break.",
     "Try to explain the concept to a friend or toy. Teaching helps!",
@@ -193,7 +206,7 @@ const LearnDashboard = ({ onboardingData }) => {
   const LS_KEY_BASE = "lesson_progress_v1";
   const LS_IDS_KEY_BASE = "lesson_completed_ids_v1";
   const LS_KEY = userScopedKey(LS_KEY_BASE);
-  const USE_LOCAL_PROGRESS = false; // set true to enable client-side caching
+  const USE_LOCAL_PROGRESS = true; // enable client-side caching so stars shift immediately
   const loadLocalProgress = () => {
     if (!USE_LOCAL_PROGRESS) return {};
     try {
@@ -217,6 +230,23 @@ const LearnDashboard = ({ onboardingData }) => {
     set.add(index);
     store[key] = Array.from(set);
     saveLocalProgress(store);
+    // Optimistically advance current progress state so UI updates immediately
+    try {
+      setProgress((prev) => {
+        // clone to avoid mutation
+        const next = Array.isArray(prev) ? [...prev] : [];
+        const chapterIdx = typeof index === 'number' ? index + 1 : null;
+        if (chapterIdx != null) {
+          const exists = next.find((p) => p?.chapter === chapterIdx);
+          if (exists) {
+            exists.conceptCompleted = true;
+          } else {
+            next.push({ chapter: chapterIdx, conceptCompleted: true });
+          }
+        }
+        return next;
+      });
+    } catch (_) {}
   };
   // Track completion by moduleId as well for robustness across ordering
   const LS_IDS_KEY = userScopedKey(LS_IDS_KEY_BASE);
@@ -674,19 +704,87 @@ const LearnDashboard = ({ onboardingData }) => {
   // Note: firstIncompleteIndex will be computed per unit to reflect local/module-id completion
   const firstIncompleteIndex = levels.findIndex((_, i) => !serverCompletedSet.has(i));
 
-  const amplitude = 30;
+  const amplitude = 20; // Reduced from 30
   const nodesCount = levels.length + 1; // modules + revision node
-  const rowSpacing = 160; // px per row (approx based on gap and node size)
-  const centerTopOffset = 80; // equals top-20
+  const rowSpacing = 120; // Reduced from 160px per row
+  const centerTopOffset = 60; // Reduced from 80
   const listHeight = nodesCount * rowSpacing;
-  const lineHeight = Math.max(200, levels.length * rowSpacing - 120);
+  const lineHeight = Math.max(150, levels.length * rowSpacing - 100); // Reduced from 200 and 120
 
   return (
     <ReviewProvider>
       <div className="bg-gradient-to-b from-[#E6F2FF] to-[#F7FBFF] h-screen flex flex-col md:flex-row overflow-hidden">
-        {/* Left Sidebar */}
-        <nav className="w-full md:w-64 p-6 space-y-4 border-b md:border-b-0 md:border-r border-blue-200 flex flex-row md:flex-col justify-around md:justify-start shrink-0 bg-white shadow-lg">
-          <h1 className="hidden md:block text-3xl font-extrabold text-blue-600 mb-6">
+        {/* Mobile Header */}
+        <div className="md:hidden bg-white border-b border-blue-200 p-4 flex items-center justify-between shadow-lg">
+          <h1 className="text-2xl font-extrabold text-blue-600">HoshiYaar</h1>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-2 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            {isMobileMenuOpen ? <CloseIcon /> : <HamburgerIcon />}
+          </button>
+        </div>
+
+        {/* Mobile Menu Overlay */}
+        {isMobileMenuOpen && (
+          <div 
+            className="md:hidden fixed inset-0 z-50 bg-black bg-opacity-50"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Mobile Menu Sidebar */}
+        <nav className={`md:hidden fixed top-0 left-0 h-full w-64 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+          <div className="p-6 space-y-4">
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-2xl font-extrabold text-blue-600">HoshiYaar</h1>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-2 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <a
+              href="#"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={`flex items-center gap-4 py-3 px-4 rounded-xl text-lg font-bold transition-colors bg-blue-500 text-white shadow-md`}
+            >
+              <LearnIcon />
+              <span>Learn</span>
+            </a>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setIsMobileMenuOpen(false);
+                navigate("/revision");
+              }}
+              className={`flex items-center gap-4 py-3 px-4 rounded-xl text-lg font-bold transition-colors text-gray-600 hover:bg-blue-50`}
+            >
+              <ReviseIcon />
+              <span>Revision</span>
+            </a>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setIsMobileMenuOpen(false);
+                navigate("/profile");
+              }}
+              className={`flex items-center gap-4 py-3 px-4 rounded-xl text-lg font-bold transition-colors text-gray-600 hover:bg-blue-50`}
+            >
+              <ProfileIcon />
+              <span>Profile</span>
+            </a>
+          </div>
+        </nav>
+
+        {/* Desktop Sidebar */}
+        <nav className="hidden md:flex md:w-64 p-6 space-y-4 border-r border-blue-200 flex-col justify-start shrink-0 bg-white shadow-lg">
+          <h1 className="text-3xl font-extrabold text-blue-600 mb-6">
             HoshiYaar
           </h1>
           <a
@@ -718,10 +816,9 @@ const LearnDashboard = ({ onboardingData }) => {
             <ProfileIcon />
             <span>Profile</span>
           </a>
-          {/* Logout removed from dashboard */}
         </nav>
 
-        <main className="flex-grow p-3 md:p-6 overflow-auto no-scrollbar bg-transparent">
+        <main className="flex-grow p-3 md:p-6 overflow-auto no-scrollbar bg-transparent mt-16 md:mt-0">
           {/* Section Header (hide when viewing chapters list). If units exist, headers are shown per unit below, so hide this top one. */}
           
 
@@ -883,7 +980,7 @@ const LearnDashboard = ({ onboardingData }) => {
                       </div>
                       
                       {/* Render modules directly */}
-                      <div className="relative flex flex-col items-center gap-24 pt-28 pb-8">
+                      <div className="relative flex flex-col items-center gap-16 sm:gap-20 md:gap-24 pt-20 sm:pt-24 md:pt-28 pb-6 sm:pb-8 px-8 sm:px-12 md:px-16 lg:px-20 xl:px-24">
                         {modulesList.map((mod, index) => {
                           const p = progress.find((c) => c.chapter === index + 1);
                           const moduleIdHere = mod?._id;
@@ -905,7 +1002,7 @@ const LearnDashboard = ({ onboardingData }) => {
                           return (
                             <div
                               key={index}
-                              className="relative w-full flex items-center justify-center"
+                              className="relative w-full flex items-center justify-center px-4 sm:px-6 md:px-8"
                               onMouseEnter={() => setHoveredIndex(index)}
                               onMouseLeave={() => setHoveredIndex(null)}
                             >
@@ -913,7 +1010,7 @@ const LearnDashboard = ({ onboardingData }) => {
                               {alignRight ? (
                                 <div className="absolute left-1/2 top-1/2 -translate-y-1/2 w-1/2">
                                   <div className="flex items-center">
-                                    <div className="h-2 md:h-3 w-28 md:w-36 rounded-full" style={{ backgroundColor: railColor }}></div>
+                                    <div className="h-1.5 sm:h-2 md:h-3 w-24 sm:w-28 md:w-32 lg:w-36 xl:w-40 rounded-full" style={{ backgroundColor: railColor }}></div>
                                     <div className="relative">
                                       {status === "active" && <StartBadge color="#2C6DEF" />}
                                       <PathNode
@@ -957,24 +1054,24 @@ const LearnDashboard = ({ onboardingData }) => {
                                         }}
                                       />
                                     </div>
-                                    <div className="h-2 md:h-3 w-28 md:w-36 rounded-full" style={{ backgroundColor: railColor }}></div>
+                                    <div className="h-1.5 sm:h-2 md:h-3 w-24 sm:w-28 md:w-32 lg:w-36 xl:w-40 rounded-full" style={{ backgroundColor: railColor }}></div>
                                   </div>
                                 </div>
                               )}
                               {/* Tooltip */}
                               <div
-                                className={`absolute ${alignRight ? "left-[62%]" : "right-[62%]"} top-full mt-4 bg-white border-4 border-blue-600 rounded-[24px] shadow-xl px-7 py-5 w-80 hidden md:block transition-all duration-500 ease-out ${
+                                className={`absolute ${alignRight ? "left-[62%]" : "right-[62%]"} top-full mt-4 bg-white border-2 border-blue-600 rounded-xl shadow-lg px-4 py-3 w-64 hidden md:block transition-all duration-500 ease-out ${
                                   hoveredIndex === index ? "opacity-100" : "opacity-0 pointer-events-none"
                                 }`}
                                 style={{ zIndex: 40 }}
                               >
-                                <div className="text-2xl font-extrabold mt-1 text-blue-700">
+                                <div className="text-lg font-extrabold mt-1 text-blue-700">
                                   {modulesList[index]?.title || "—"}
                                 </div>
-                                <div className="text-xl font-semibold text-blue-700/80">
+                                <div className="text-base font-semibold text-blue-700/80">
                                   {chapterTitle || "—"}
                                 </div>
-                                <div className="text-base font-medium text-blue-700/60">
+                                <div className="text-sm font-medium text-blue-700/60">
                                   {subjectName || "—"}
                                 </div>
                               </div>
@@ -990,8 +1087,8 @@ const LearnDashboard = ({ onboardingData }) => {
                     // Make the center line span from the first star to the revision star
                     // Start line a bit below the unit header and stop slightly above the next header
                     const localLineHeight = Math.max(
-                      120,
-                      (localLevels.length - 1) * rowSpacing + 100
+                      160,
+                      (localLevels.length) * rowSpacing + 120
                     );
                     return (
                       <div
@@ -1031,10 +1128,10 @@ const LearnDashboard = ({ onboardingData }) => {
                         {/* Center line for this unit */}
                         {(() => { const color = unitPalette[unitIdx % unitPalette.length]; return (
                         <div
-                          className="absolute left-1/2 -translate-x-1/2 w-3 rounded-full z-20 shadow-[0_0_0_6px_rgba(255,255,255,0.5)]"
-                          style={{ top: 240, height: localLineHeight, backgroundColor: lighten(color, 0.5) }}
+                          className="absolute left-1/2 -translate-x-1/2 w-2 sm:w-2.5 md:w-3 rounded-full z-20 shadow-[0_0_0_4px_rgba(255,255,255,0.5)] sm:shadow-[0_0_0_5px_rgba(255,255,255,0.5)] md:shadow-[0_0_0_6px_rgba(255,255,255,0.5)]"
+                          style={{ top: 200, height: localLineHeight + 40, backgroundColor: lighten(color, 0.5) }}
                         /> ); })()}
-                        <div className="relative flex flex-col items-center gap-24 pt-28 pb-8">
+                        <div className="relative flex flex-col items-center gap-16 sm:gap-20 md:gap-24 pt-20 sm:pt-24 md:pt-28 pb-6 sm:pb-8 px-8 sm:px-12 md:px-16 lg:px-20 xl:px-24">
                           {localLevels.map((mod, index) => {
                             const p = progress.find((c) => c.chapter === index + 1);
                             const moduleIdHere = unitMods[index]?._id;
@@ -1060,7 +1157,7 @@ const LearnDashboard = ({ onboardingData }) => {
                             return (
                               <div
                                 key={index}
-                                className="relative w-full flex items-center justify-center"
+                                className="relative w-full flex items-center justify-center px-4 sm:px-6 md:px-8"
                                 onMouseEnter={() => setHoveredIndex(index)}
                                 onMouseLeave={() => setHoveredIndex(null)}
                               >
@@ -1068,7 +1165,7 @@ const LearnDashboard = ({ onboardingData }) => {
                                 {alignRight ? (
                                   <div className="absolute left-1/2 top-1/2 -translate-y-1/2 w-1/2">
                                     <div className="flex items-center">
-                                      <div className="h-2 md:h-3 w-28 md:w-36 rounded-full" style={{ backgroundColor: railColor }}></div>
+                                      <div className="h-1.5 sm:h-2 md:h-3 w-24 sm:w-28 md:w-32 lg:w-36 xl:w-40 rounded-full" style={{ backgroundColor: railColor }}></div>
                                       <div className="relative">
                                         {status === "active" && <StartBadge color={unitPalette[unitIdx % unitPalette.length]} />}
                                         <PathNode
@@ -1113,26 +1210,26 @@ const LearnDashboard = ({ onboardingData }) => {
                                           }}
                                         />
                                       </div>
-                                      <div className="h-2 md:h-3 w-28 md:w-36 rounded-full" style={{ backgroundColor: railColor }}></div>
+                                      <div className="h-1.5 sm:h-2 md:h-3 w-24 sm:w-28 md:w-32 lg:w-36 xl:w-40 rounded-full" style={{ backgroundColor: railColor }}></div>
                                     </div>
                                   </div>
                                 )}
                                 {/* Tooltip (hover only with smooth transition) - placed below the star */}
                                 <div
-                                  className={`absolute ${alignRight ? "left-[62%]" : "right-[62%]"} top-full mt-4 bg-white border-4 border-blue-600 rounded-[24px] shadow-xl px-7 py-5 w-80 hidden md:block transition-all duration-500 ease-out ${
+                                  className={`absolute ${alignRight ? "left-[62%]" : "right-[62%]"} top-full mt-4 bg-white border-2 border-blue-600 rounded-xl shadow-lg px-4 py-3 w-64 hidden md:block transition-all duration-500 ease-out ${
                                     hoveredIndex === index ? "opacity-100" : "opacity-0 pointer-events-none"
                                   }`}
                                   style={{ zIndex: 40 }}
                                 >
-                                  <div className="text-2xl font-extrabold mt-1 text-blue-700">
+                                  <div className="text-lg font-extrabold mt-1 text-blue-700">
                                     {unitMods[index]?.title ||
                                       moduleTitle ||
                                       "—"}
                                   </div>
-                                  <div className="text-xl font-semibold text-blue-700/80">
+                                  <div className="text-base font-semibold text-blue-700/80">
                                     {u.title || unitTitle || "—"}
                                   </div>
-                                  <div className="text-base font-medium text-blue-700/60">
+                                  <div className="text-sm font-medium text-blue-700/60">
                                     {chapterTitle || "—"}
                                   </div>
                                 </div>
@@ -1146,12 +1243,12 @@ const LearnDashboard = ({ onboardingData }) => {
                             const starAlignRight = !lastAlignRight; // place revision star opposite the last node
                             const railColor = lighten(unitPalette[unitIdx % unitPalette.length], 0.55);
                             return (
-                              <div className="relative w-full h-28">
+                              <div className="relative w-full h-24 sm:h-28 px-4 sm:px-6 md:px-8">
                                 {starAlignRight ? (
                                   <div className="absolute left-1/2 top-1/2 -translate-y-1/2 w-1/2 flex items-center">
                                     <div
-                                      className="h-2 md:h-3 rounded-full"
-                                      style={{ width: `calc(50% - 90px)`, backgroundColor: railColor, opacity: 0.8 }}
+                                      className="h-1.5 sm:h-2 md:h-3 rounded-full w-[calc(50%-32px)] sm:w-[calc(50%-36px)] md:w-[calc(50%-40px)] lg:w-[calc(50%-44px)] xl:w-[calc(50%-48px)]"
+                                      style={{ backgroundColor: railColor, opacity: 0.8 }}
                                     ></div>
                                     <RevisionStar
                                       align="right"
@@ -1167,8 +1264,8 @@ const LearnDashboard = ({ onboardingData }) => {
                                       unitId={u?._id}
                                     />
                                     <div
-                                      className="h-2 md:h-3 rounded-full"
-                                      style={{ width: `calc(50% - 90px)`, backgroundColor: railColor, opacity: 0.8 }}
+                                      className="h-1.5 sm:h-2 md:h-3 rounded-full w-[calc(50%-32px)] sm:w-[calc(50%-36px)] md:w-[calc(50%-40px)] lg:w-[calc(50%-44px)] xl:w-[calc(50%-48px)]"
+                                      style={{ backgroundColor: railColor, opacity: 0.8 }}
                                     ></div>
                                   </div>
                                 )}

@@ -5,6 +5,14 @@ module.exports = {
   ],
   theme: {
     extend: {
+      screens: {
+        'xs': '475px',
+        'sm': '640px',
+        'md': '768px',
+        'lg': '1024px',
+        'xl': '1280px',
+        '2xl': '1536px',
+      },
       colors: {
         'duo-blue': '#1E65FA',
         'duo-blue-dark': '#0A3DAA',
@@ -17,6 +25,30 @@ module.exports = {
       },
       fontFamily: {
         sans: ['"Nunito"', 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+      },
+      fontSize: {
+        'responsive-xs': ['0.75rem', { lineHeight: '1rem' }],
+        'responsive-sm': ['0.875rem', { lineHeight: '1.25rem' }],
+        'responsive-base': ['1rem', { lineHeight: '1.5rem' }],
+        'responsive-lg': ['1.125rem', { lineHeight: '1.75rem' }],
+        'responsive-xl': ['1.25rem', { lineHeight: '1.75rem' }],
+        'responsive-2xl': ['1.5rem', { lineHeight: '2rem' }],
+        'responsive-3xl': ['1.875rem', { lineHeight: '2.25rem' }],
+      },
+      spacing: {
+        'responsive-xs': '0.5rem',
+        'responsive-sm': '1rem',
+        'responsive-md': '1.5rem',
+        'responsive-lg': '2rem',
+        'responsive-xl': '3rem',
+      },
+      maxWidth: {
+        'screen-xs': '475px',
+        'screen-sm': '640px',
+        'screen-md': '768px',
+        'screen-lg': '1024px',
+        'screen-xl': '1280px',
+        'screen-2xl': '1536px',
       },
       animation: {
         scroll: 'scroll 40s linear infinite',
