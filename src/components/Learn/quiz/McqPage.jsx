@@ -99,26 +99,17 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
   // Allow native browser back (no intercept)
   useEffect(() => {}, []);
 
-  // Enter to continue/submit
+  // Disable Enter key triggering selection on MCQ pages
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key !== 'Enter') return;
-      console.log('[MCQ] Enter pressed', { showResult, selectedIndex });
-      if (!item) return;
-      if (!showResult) {
-        // if nothing selected, select first option
-        const idx = selectedIndex == null ? 0 : selectedIndex;
-        console.log('[MCQ] Submitting option via Enter', idx);
-        handleOptionClick(idx);
-      } else {
-        // after result, go next
-        console.log('[MCQ] Continuing via Enter');
-        handleNext();
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [item, showResult, selectedIndex]);
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, []);
 
   function routeForType(type, idx) {
     switch (type) {
@@ -362,6 +353,8 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
                   onClick={() => handleOptionClick(idx)}
                   className={buttonClass}
                   disabled={showResult}
+                  tabIndex={-1}
+                  onKeyDown={(e) => { e.preventDefault(); }}
                 >
                   {isImageUrl ? (
                     <div className="flex flex-col items-center">

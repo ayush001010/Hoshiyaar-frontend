@@ -157,44 +157,16 @@ export default function RevisionList() {
       // If defaultOnly view at unit level, map defaults to items list (questionId resolvable)
       if (defaultOnly && unitId) {
         try {
-          const mapped = [];
-          const byModule = new Map();
-          for (const d of defaultEntries) {
-            const mid = String(d.moduleId || '');
-            if (!mid) continue;
-            if (!byModule.has(mid)) {
-              const res = await curriculumService.listItems(mid);
-              byModule.set(mid, res?.data || []);
-            }
-            const arr = byModule.get(mid);
-            const idx = arr.findIndex(x => {
-              const t = String(d.type || '').toLowerCase();
-              if (t === 'multiple-choice') return (x.type === 'multiple-choice') && (String(x.question||'').trim().toLowerCase() === String(d.question||'').trim().toLowerCase());
-              if (t === 'fill-in-the-blank') return (x.type === 'fill-in-the-blank') && (String(x.question||'').trim().toLowerCase() === String(d.question||'').trim().toLowerCase());
-              if (t === 'rearrange') return (x.type === 'rearrange') && (String(x.question||'').trim().toLowerCase() === String(d.question||'').trim().toLowerCase());
-              return (x.type === 'statement') && (String(x.text||'').trim().toLowerCase() === String(d.text||'').trim().toLowerCase());
-            });
-            if (idx >= 0) {
-              mapped.push({
-                questionId: `${mid}_${idx}_` + (d.type || 'statement'),
-                moduleId: mid,
-                label: d.question || d.text || `Default`,
-                count: 0,
-                lastSeenAt: null,
-                _source: 'default'
-              });
-            }
-          }
-          // Dedupe by questionId to avoid repeated queue items
-          const uniq = [];
-          const seen = new Set();
-          for (const it of mapped) {
-            if (it?.questionId && !seen.has(it.questionId)) {
-              seen.add(it.questionId);
-              uniq.push(it);
-            }
-          }
-          setItems(uniq);
+          // Show ALL defaults as-is, without mapping to module items
+          const mappedAll = (defaultEntries || []).map((d, i) => ({
+            questionId: `${String(d.moduleId || 'unknown')}_${String(i)}_${String(d.type || 'statement')}`,
+            moduleId: String(d.moduleId || ''),
+            label: d.question || d.text || `Default ${i + 1}`,
+            count: 0,
+            lastSeenAt: null,
+            _source: 'default'
+          }));
+          setItems(mappedAll);
         } catch (_) {
           setItems([]);
         }
@@ -258,14 +230,7 @@ export default function RevisionList() {
   const startReview = () => {
     // Build queue synchronously and then navigate with a brief tick to let context update
     reset();
-    const unique = [];
-    const seen = new Set();
-    for (const it of items) {
-      if (!it?.questionId) continue;
-      if (seen.has(it.questionId)) continue;
-      seen.add(it.questionId);
-      unique.push(it);
-    }
+    const unique = items.filter(it => !!it?.questionId);
     unique.forEach(({ questionId }) => {
       const [mod, idx, type] = String(questionId).split('_');
       add({ questionId, moduleNumber: mod, index: idx, type: type || 'multiple-choice' });

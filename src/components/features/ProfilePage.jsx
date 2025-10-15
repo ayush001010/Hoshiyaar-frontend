@@ -106,18 +106,7 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pr-0 md:pr-28">
           <label className="block">
             <span className="text-sm font-bold text-gray-700">Username</span>
-            <input placeholder={form.username || 'Choose a unique username'} value={form.username} onChange={async (e)=>{
-              const val = e.target.value;
-              update('username', val);
-              setUsernameStatus('');
-              try {
-                if (!val || val === user?.username) return;
-                const res = await authService.checkUsername(val);
-                setUsernameStatus(res?.data?.available ? 'available' : 'taken');
-              } catch (_) { setUsernameStatus(''); }
-            }} className="mt-1 w-full px-4 py-3 rounded-2xl border-2 border-blue-200 focus:outline-none focus:border-blue-400" />
-            {usernameStatus === 'taken' && (<div className="mt-1 text-xs font-semibold text-red-600">Username already taken</div>)}
-            {usernameStatus === 'available' && (<div className="mt-1 text-xs font-semibold text-green-600">Username available</div>)}
+            <input placeholder={form.username || 'Choose a unique username'} value={form.username} readOnly className="mt-1 w-full px-4 py-3 rounded-2xl border-2 bg-gray-50 border-blue-200 text-gray-600" />
           </label>
           <label className="block">
             <span className="text-sm font-bold text-gray-700">Name</span>
@@ -137,7 +126,16 @@ export default function ProfilePage() {
           </label>
           <label className="block">
             <span className="text-sm font-bold text-gray-700">Class</span>
-            <input placeholder={form.classLevel || 'Not Defined'} value={form.classLevel} onChange={e=>update('classLevel', e.target.value)} className="mt-1 w-full px-4 py-3 rounded-2xl border-2 border-blue-200 focus:outline-none focus:border-blue-400" />
+            <select
+              value={form.classLevel === 'Not Defined' ? '' : String(form.classLevel || '')}
+              onChange={e => update('classLevel', e.target.value)}
+              className="mt-1 w-full px-4 py-3 rounded-2xl border-2 border-blue-200 focus:outline-none focus:border-blue-400 bg-white text-gray-800"
+            >
+              <option value="" disabled>Select class</option>
+              {Array.from({ length: 12 }, (_, i) => String(i + 1)).map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </label>
           <label className="block">
             <span className="text-sm font-bold text-gray-700">Age</span>

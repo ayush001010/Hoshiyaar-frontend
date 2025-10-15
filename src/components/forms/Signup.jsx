@@ -60,7 +60,7 @@ const Signup = () => {
       if (response.data && response.data.token) {
         login(response.data);
         try { sessionStorage.setItem('entryType', 'signup'); } catch (_) {}
-        navigate('/learn');
+        navigate('/onboard');
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Signup failed. Please try again.');
@@ -139,14 +139,17 @@ const Signup = () => {
                 </div>
                 <div className="text-left">
                   <label className="text-xs sm:text-sm text-gray-300 mb-2 block">Class</label>
-                  <input
-                    type="text"
+                  <select
                     name="classLevel"
                     value={formData.classLevel}
                     onChange={onChange}
-                    placeholder="Class"
-                    className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-xl sm:rounded-2xl p-3 sm:p-4 focus:outline-none focus:border-duo-blue text-sm sm:text-base"
-                  />
+                    className="w-full bg-[#3c3c3c] border-2 border-[#585858] rounded-xl sm:rounded-2xl p-3 sm:p-4 focus:outline-none focus:border-duo-blue text-sm sm:text-base text-white"
+                  >
+                    <option value="" disabled>Select class</option>
+                    {Array.from({ length: 12 }, (_, i) => String(i + 1)).map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <button

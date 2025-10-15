@@ -4,6 +4,7 @@ import { useReview } from '../../../context/ReviewContext.jsx';
 import image07 from '../../../assets/images/image-07.png';
 import reattemptImg from '../../../assets/images/reattempt.png';
 import finishImg from '../../../assets/images/finish.png';
+import victorySound from '../../../assets/sounds/victory.mp3';
  
 const LessonComplete = () => {
   const navigate = useNavigate();
@@ -14,6 +15,18 @@ const LessonComplete = () => {
   useEffect(() => {
     setIsChecking(false);
   }, []);
+
+  // Play victory sound only when there are no review items (final page)
+  useEffect(() => {
+    if (hasItems) return; // queue not empty → don't play
+    const audio = new Audio(victorySound);
+    audio.volume = 0.6;
+    audio.play().catch(() => { /* ignore autoplay restrictions */ });
+    return () => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
+  }, [hasItems]);
 
   // Allow pressing Enter to trigger main CTA: Re-attempt when available, otherwise Continue Learning
   useEffect(() => {

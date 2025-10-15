@@ -21,6 +21,7 @@ import LessonComplete from './components/Learn/pages/LessonComplete.jsx';
 import ConceptPage from './components/Learn/pages/ConceptPage.jsx';
 import UploadTest from './components/features/UploadTest.jsx';
 import ProfilePage from './components/features/ProfilePage.jsx';
+import OnboardingFlow from './components/Learn/selectors/OnboardingFlow.jsx';
 
 const MainLayout = ({ children }) => (
   <div className="font-sans">
@@ -47,6 +48,16 @@ function App() {
               <HomePage />
             </MainLayout>
           } />
+
+          {/* Onboarding route */}
+          <Route 
+            path="/onboard" 
+            element={
+              <ProtectedRoute>
+                <OnboardingFlow />
+              </ProtectedRoute>
+            } 
+          />
 
           {/* Protected Learning Route */}
           <Route 
