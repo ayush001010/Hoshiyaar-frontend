@@ -31,7 +31,7 @@ const BoardOption = ({ label, value, selectedValue, onChange }) => (
 
 import authService from '../../../services/authService.js';
 
-const BoardSelect = ({ onContinue, onBack, updateData }) => {
+const BoardSelect = ({ onContinue, onBack, updateData, autoAdvance = true }) => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [selectedBoard, setSelectedBoard] = useState('');
@@ -48,6 +48,13 @@ const BoardSelect = ({ onContinue, onBack, updateData }) => {
                 const res = await curriculumService.listBoards();
                 const names = (res?.data || []).map(b => b.name);
                 setBoards(names);
+                // If only one board, auto-select and continue
+                if (autoAdvance && names.length === 1) {
+                    const only = names[0];
+                    setSelectedBoard(only);
+                    updateData?.({ board: only });
+                    setTimeout(() => onContinue?.(), 0);
+                }
             } catch (_) {
                 setBoards([]);
             } finally {
@@ -57,14 +64,23 @@ const BoardSelect = ({ onContinue, onBack, updateData }) => {
         loadBoards();
     }, []);
 
-    const handleSelection = (e) => {
-        setSelectedBoard(e.target.value);
+    const handleSelection = async (e) => {
+        const val = e.target.value;
+        setSelectedBoard(val);
+        updateData?.({ board: val });
+        // Step-ahead prefetch: subjects for chosen board
+        try {
+            const res = await curriculumService.listSubjects(val);
+            const names = (res?.data || []).map(s => s.name);
+            try { sessionStorage.setItem(`subjects_cache_v1__${val}`, JSON.stringify(names || [])); } catch(_) {}
+        } catch (_) {}
+        if (autoAdvance) setTimeout(() => onContinue?.(), 0);
     };
 
     const handleContinue = async () => {
         if (selectedBoard) {
             updateData?.({ board: selectedBoard });
-            onContinue();
+            onContinue?.();
         }
     };
     

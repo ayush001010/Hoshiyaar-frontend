@@ -21,10 +21,10 @@ const BackArrow = ({ onClick }) => (
 // Placeholder icons for chapters
 const TreeIcon = () => <span className="text-2xl">🌳</span>;
 const HumanBodyIcon = () => <span className="text-2xl">🧍</span>;
-const DefaultIcon = () => <div className="w-8 h-8 rounded-full border-2 border-gray-400" />;
+const DefaultIcon = () => <div className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full border-2 border-gray-400" />;
 
 
-const ChapterSelect = ({ onContinue, onBack, updateData }) => {
+const ChapterSelect = ({ onContinue, onBack, updateData, autoAdvance = false, board = 'CBSE', subject = 'Science' }) => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [selectedChapter, setSelectedChapter] = useState(null);
@@ -36,12 +36,18 @@ const ChapterSelect = ({ onContinue, onBack, updateData }) => {
             navigate('/learn', { replace: true });
             return;
         }
+        const cacheKey = (b,s) => `chapters_cache_v1__${b}__${s}`;
+        const loadCache = (b,s) => { try { return JSON.parse(sessionStorage.getItem(cacheKey(b,s)) || '[]') || []; } catch(_) { return []; } };
+        const saveCache = (b,s,arr) => { try { sessionStorage.setItem(cacheKey(b,s), JSON.stringify(arr || [])); } catch(_) {} };
         const loadChapters = async () => {
             try {
-                // For now default to CBSE + Science; can pass selected board/subject from parent
-                const res = await curriculumService.listChapters('CBSE', 'Science');
+                // Hydrate from cache first for instant paint
+                const cached = loadCache(board || 'CBSE', subject || 'Science');
+                if (cached.length > 0) setChapters(cached);
+                const res = await curriculumService.listChapters(board || 'CBSE', subject || 'Science');
                 const list = (res?.data || []).map((c, idx) => ({ id: c._id, name: c.title, order: c.order ?? idx + 1 }));
                 setChapters(list);
+                if (list && list.length > 0) saveCache(board || 'CBSE', subject || 'Science', list);
             } catch (_) {
                 setChapters([]);
             } finally {
@@ -49,11 +55,11 @@ const ChapterSelect = ({ onContinue, onBack, updateData }) => {
             }
         };
         loadChapters();
-    }, []);
+    }, [board, subject]);
 
     const handleContinue = () => {
         updateData({ chapter: selectedChapter });
-        onContinue(selectedChapter);
+        onContinue?.(selectedChapter);
     };
 
     return (
@@ -78,14 +84,14 @@ const ChapterSelect = ({ onContinue, onBack, updateData }) => {
                             <p className="text-xl">Ready to learn? Pick a chapter to start!</p>
                         </div>
                     </div>
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                         {loading && (<div className="text-gray-500 text-lg">Loading chapters...</div>)}
                         {!loading && chapters.length === 0 && (<div className="text-gray-500 text-lg">No chapters found.</div>)}
                         {!loading && chapters.map((chapter) => (
                             <button
                                 key={chapter.id}
-                                onClick={() => setSelectedChapter(chapter.name)}
-                                className={`w-full p-6 rounded-2xl border-2 flex items-center gap-6 text-left text-xl font-extrabold transition-colors ${
+                                onClick={() => { setSelectedChapter(chapter.name); updateData?.({ chapter: chapter.name }); if (autoAdvance) setTimeout(() => onContinue?.(chapter.name), 0); }}
+                                className={`w-full p-4 sm:p-5 md:p-6 rounded-2xl border-2 flex items-center gap-4 sm:gap-5 md:gap-6 text-left text-lg sm:text-xl font-extrabold transition-colors ${
                                     selectedChapter === chapter.name
                                     ? 'bg-green-200 border-green-500'
                                     : 'bg-white border-gray-300 hover:border-gray-400'

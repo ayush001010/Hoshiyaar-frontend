@@ -33,8 +33,9 @@ export default function OnboardingFlow() {
     return (
       <BoardSelect
         updateData={updateData}
-        onContinue={() => {}}
+        onContinue={() => setData((d)=>({ ...d }))}
         onBack={() => navigate('/login')}
+        autoAdvance={true}
       />
     );
   }
@@ -43,8 +44,9 @@ export default function OnboardingFlow() {
       <SubjectSelect
         selectedBoard={data.board}
         updateData={updateData}
-        onContinue={() => {}}
+        onContinue={() => setData((d)=>({ ...d }))}
         onBack={() => updateData({ board: '' })}
+        autoAdvance={true}
       />
     );
   }
@@ -54,6 +56,9 @@ export default function OnboardingFlow() {
         updateData={updateData}
         onContinue={() => saveAndContinue()}
         onBack={() => updateData({ subject: '' })}
+        autoAdvance={false}
+        board={data.board}
+        subject={data.subject}
       />
     );
   }

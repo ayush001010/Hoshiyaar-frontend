@@ -17,18 +17,36 @@ const BackArrow = ({ onClick }) => (
 );
 
 
-const SubjectSelect = ({ onContinue, onBack, updateData, selectedBoard = 'CBSE' }) => {
+const SubjectSelect = ({ onContinue, onBack, updateData, selectedBoard = 'CBSE', autoAdvance = true }) => {
     const [selectedSubject, setSelectedSubject] = useState(null);
     const [subjects, setSubjects] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const cacheKey = (board) => `subjects_cache_v1__${board}`;
+    const loadCache = (board) => {
+        try { return JSON.parse(sessionStorage.getItem(cacheKey(board)) || '[]') || []; } catch(_) { return []; }
+    };
+    const saveCache = (board, arr) => {
+        try { sessionStorage.setItem(cacheKey(board), JSON.stringify(arr || [])); } catch(_) {}
+    };
+
     useEffect(() => {
         const loadSubjects = async () => {
             try {
+                // Hydrate from cache first for instant paint
+                const cached = loadCache(selectedBoard || 'CBSE');
+                if (cached.length > 0) setSubjects(cached);
                 // Fetch subjects for the selected board
                 const res = await curriculumService.listSubjects(selectedBoard || 'CBSE');
                 const names = (res?.data || []).map(s => s.name);
                 setSubjects(names);
+                if (names && names.length > 0) saveCache(selectedBoard || 'CBSE', names);
+                if (autoAdvance && names.length === 1) {
+                    const only = names[0];
+                    setSelectedSubject(only);
+                    updateData?.({ subject: only });
+                    setTimeout(() => onContinue?.(), 0);
+                }
             } catch (_) {
                 setSubjects([]);
             } finally {
@@ -70,7 +88,17 @@ const SubjectSelect = ({ onContinue, onBack, updateData, selectedBoard = 'CBSE' 
                         {!loading && subjects.map((subject) => (
                             <button
                                 key={subject}
-                                onClick={() => setSelectedSubject(subject)}
+                                onClick={async () => { 
+                                    setSelectedSubject(subject); 
+                                    updateData?.({ subject }); 
+                                    // Step-ahead prefetch: chapters for chosen subject
+                                    try {
+                                        const res = await curriculumService.listChapters(selectedBoard || 'CBSE', subject);
+                                        const list = (res?.data || []).map((c, idx) => ({ id: c._id, name: c.title, order: c.order ?? idx + 1 }));
+                                        try { sessionStorage.setItem(`chapters_cache_v1__${selectedBoard || 'CBSE'}__${subject}`, JSON.stringify(list || [])); } catch(_) {}
+                                    } catch (_) {}
+                                    if (autoAdvance) setTimeout(() => onContinue?.(), 0); 
+                                }}
                                 className={`p-8 text-center rounded-2xl border-2 text-xl font-extrabold transition-colors ${
                                     selectedSubject === subject 
                                     ? 'bg-green-200 border-green-500' 
@@ -87,7 +115,7 @@ const SubjectSelect = ({ onContinue, onBack, updateData, selectedBoard = 'CBSE' 
             {/* Footer with Continue button */}
             <div className="border-t pt-6 px-6 pb-6 flex justify-end">
                 <button 
-                    onClick={() => { updateData?.({ subject: selectedSubject }); onContinue(); }}
+                    onClick={() => { updateData?.({ subject: selectedSubject }); onContinue?.(); }}
                     disabled={!selectedSubject}
                     className="bg-green-600 text-white font-extrabold py-5 px-12 rounded-xl text-xl transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-green-700 shadow-[0_6px_0_0_rgba(0,0,0,0.15)]"
                 >
