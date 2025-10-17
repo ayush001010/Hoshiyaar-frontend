@@ -4,28 +4,37 @@ import axios from 'axios';
 const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)/.test(window.location.hostname);
 const API = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : ''));
 
+// Centralized axios instance with sane defaults to avoid hanging requests
+const http = axios.create({
+  baseURL: API,
+  timeout: 12000, // 12s timeout to fail fast and render fallbacks
+  withCredentials: false,
+});
+
+const passOpts = (opts) => (opts && typeof opts === 'object' ? opts : {});
+
 const curriculumService = {
-  listBoards() {
-    return axios.get(`${API}/api/curriculum/boards`);
+  listBoards(opts) {
+    return http.get(`/api/curriculum/boards`, passOpts(opts));
   },
-  listSubjects(board = 'CBSE') {
-    return axios.get(`${API}/api/curriculum/subjects`, { params: { board } });
+  listSubjects(board = 'CBSE', opts) {
+    return http.get(`/api/curriculum/subjects`, { params: { board }, ...passOpts(opts) });
   },
-  listChapters(board = 'CBSE', subject = 'Science', extraParams = {}) {
+  listChapters(board = 'CBSE', subject = 'Science', extraParams = {}, opts) {
     // extraParams can include { userId, classTitle }
-    return axios.get(`${API}/api/curriculum/chapters`, { params: { board, subject, ...(extraParams || {}) } });
+    return http.get(`/api/curriculum/chapters`, { params: { board, subject, ...(extraParams || {}) }, ...passOpts(opts) });
   },
-  listUnits(chapterId) {
-    return axios.get(`${API}/api/curriculum/units`, { params: { chapterId } });
+  listUnits(chapterId, opts) {
+    return http.get(`/api/curriculum/units`, { params: { chapterId }, ...passOpts(opts) });
   },
-  listModules(chapterId) {
-    return axios.get(`${API}/api/curriculum/modules`, { params: { chapterId } });
+  listModules(chapterId, opts) {
+    return http.get(`/api/curriculum/modules`, { params: { chapterId }, ...passOpts(opts) });
   },
-  listModulesByUnit(unitId) {
-    return axios.get(`${API}/api/curriculum/modules`, { params: { unitId } });
+  listModulesByUnit(unitId, opts) {
+    return http.get(`/api/curriculum/modules`, { params: { unitId }, ...passOpts(opts) });
   },
-  listItems(moduleId) {
-    return axios.get(`${API}/api/curriculum/items`, { params: { moduleId } });
+  listItems(moduleId, opts) {
+    return http.get(`/api/curriculum/items`, { params: { moduleId }, ...passOpts(opts) });
   },
 };
 

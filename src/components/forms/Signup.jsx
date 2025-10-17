@@ -59,8 +59,17 @@ const Signup = () => {
       });
       if (response.data && response.data.token) {
         login(response.data);
-        try { sessionStorage.setItem('entryType', 'signup'); } catch (_) {}
-        navigate('/onboard');
+        try {
+          sessionStorage.setItem('entryType', 'signup');
+          const uid = response.data?._id;
+          if (uid) {
+            const localKey = `learnOnboarded_${uid}`;
+            const sessionKey = `learnWasOnDashboard_${uid}`;
+            try { localStorage.removeItem(localKey); } catch (_) {}
+            try { sessionStorage.removeItem(sessionKey); } catch (_) {}
+          }
+        } catch (_) {}
+        navigate('/learn');
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Signup failed. Please try again.');

@@ -367,9 +367,10 @@ const LearnDashboard = ({ onboardingData }) => {
         if (isNewUser) {
           console.log('Dashboard: New user detected, fetching available options...');
           try {
+            const ac = new AbortController();
             const [boardsResp, subjectsResp] = await Promise.all([
-              cur.listBoards(),
-              cur.listSubjects(selectedBoard)
+              cur.listBoards({ signal: ac.signal }),
+              cur.listSubjects(selectedBoard, { signal: ac.signal })
             ]);
             const boards = boardsResp?.data || [];
             const subjects = subjectsResp?.data || [];
@@ -390,9 +391,14 @@ const LearnDashboard = ({ onboardingData }) => {
           }
         }
         
+        const ac2 = new AbortController();
+        const validUserId = typeof user?._id === 'string' && user._id.length >= 8 && user._id !== 'undefined' ? user._id : null;
+        const extraChapterParams = user?._id
+          ? { userId: user._id, classTitle: user?.classLevel || user?.classTitle || undefined }
+          : {};
         const [progressResp, chaptersResp] = await Promise.all([
-          user?._id ? svc.getProgress(user._id) : Promise.resolve({ data: [] }),
-          cur.listChapters(finalBoard, finalSubject, user?._id ? { userId: user._id } : {}),
+          validUserId ? svc.getProgress(validUserId, { signal: ac2.signal }) : Promise.resolve({ data: [] }),
+          cur.listChapters(finalBoard, finalSubject, extraChapterParams, { signal: ac2.signal }),
         ]);
         console.log('Dashboard: API responses', { progressResp: progressResp?.data, chaptersResp: chaptersResp?.data });
         const progressData = progressResp?.data || [];
@@ -415,40 +421,53 @@ const LearnDashboard = ({ onboardingData }) => {
         let listCh = chaptersResp?.data || [];
         console.log('Dashboard: Chapters found', listCh);
         
-        // If no chapters found, try other available options
+        // If no chapters found, try other available options (fetch them if not present)
         if (listCh.length === 0) {
           console.log('Dashboard: No chapters found, trying other available options...');
-          for (const board of availableBoards) {
-            for (const subject of availableSubjects) {
-              if (board.name !== finalBoard || subject.name !== finalSubject) {
-                try {
-                  const altChaptersResp = await cur.listChapters(board.name, subject.name);
-                  const altChapters = altChaptersResp?.data || [];
-                  if (altChapters.length > 0) {
-                    console.log('Dashboard: Found chapters with alternative options', { board: board.name, subject: subject.name, count: altChapters.length });
-                    listCh = altChapters;
-                    finalBoard = board.name;
-                    finalSubject = subject.name;
-                    break;
-                  }
-                } catch (e) {
-                  console.warn('Dashboard: Failed to fetch chapters for', board.name, subject.name, e);
+          let boardsToTry = availableBoards;
+          let subjectsToTry = availableSubjects;
+          try {
+            if (!boardsToTry || boardsToTry.length === 0) {
+              const br = await cur.listBoards();
+              boardsToTry = br?.data || [];
+              setAvailableBoards(boardsToTry);
+            }
+          } catch (_) {}
+          try {
+            if (!subjectsToTry || subjectsToTry.length === 0) {
+              const sr = await cur.listSubjects(finalBoard);
+              subjectsToTry = sr?.data || [];
+              setAvailableSubjects(subjectsToTry);
+            }
+          } catch (_) {}
+          for (const board of boardsToTry) {
+            for (const subject of subjectsToTry) {
+              try {
+                const altChaptersResp = await cur.listChapters(board.name, subject.name);
+                const altChapters = altChaptersResp?.data || [];
+                if (altChapters.length > 0) {
+                  console.log('Dashboard: Found chapters with alternative options', { board: board.name, subject: subject.name, count: altChapters.length });
+                  listCh = altChapters;
+                  finalBoard = board.name;
+                  finalSubject = subject.name;
+                  break;
                 }
+              } catch (e) {
+                console.warn('Dashboard: Failed to fetch chapters for', board.name, subject.name, e);
               }
             }
             if (listCh.length > 0) break;
           }
-          
-          // If still no chapters, try to fetch any chapters without board/subject filter
+          // Absolute fallback: fetch any known default pairing
           if (listCh.length === 0) {
-            console.log('Dashboard: Still no chapters, trying to fetch any available chapters...');
+            console.log('Dashboard: Still no chapters, trying default CBSE/Science as a last resort...');
             try {
-              // Try to get chapters by fetching all and taking the first one
-              const allChaptersResp = await cur.listChapters('CBSE', 'Science');
+              const allChaptersResp = await cur.listChapters('CBSE', 'Science', {}, { signal: (new AbortController()).signal });
               const allChapters = allChaptersResp?.data || [];
               if (allChapters.length > 0) {
-                console.log('Dashboard: Found chapters with fallback method', { count: allChapters.length });
                 listCh = allChapters;
+                finalBoard = 'CBSE';
+                finalSubject = 'Science';
               }
             } catch (e) {
               console.warn('Dashboard: Fallback chapter fetch failed', e);
@@ -456,25 +475,48 @@ const LearnDashboard = ({ onboardingData }) => {
           }
         }
         
-        // Final safety net: if still no chapters, create a dummy one to avoid empty state
+        // If still no chapters, stop here without creating dummies
         if (listCh.length === 0) {
-          console.log('Dashboard: Creating dummy chapter to avoid empty state');
-          const dummyChapter = {
-            _id: 'dummy-chapter',
-            title: 'Welcome to Learning!',
-            subjectId: null,
-            order: 1
-          };
-          listCh = [dummyChapter];
+          console.warn('Dashboard: No chapters available after all attempts');
+          setChaptersList([]);
+          setUnitsList([]);
+          setModulesList([]);
+          setIsLoading(false);
+          setHasFetched(true);
+          return;
         }
         
         setChaptersList(listCh);
         const params = new URLSearchParams(window.location.search);
         const preferId = params.get("chapterId") || preferredChapterId;
-        const ch = preferId
-          ? listCh.find((c) => c._id === preferId)
-          : listCh[0];
+        // Normalize chapter objects from API (support variants like id, _id, chapterId or even strings)
+        const toChapter = (raw, index = 0) => {
+          if (!raw) return null;
+          if (typeof raw === 'string') {
+            return { _id: `str-${index}`, title: String(raw), order: index + 1 };
+          }
+          const id = raw._id || raw.id || raw.chapterId;
+          const title = raw.title || raw.name || `Chapter ${index + 1}`;
+          return id ? { _id: String(id), title, order: raw.order ?? index + 1 } : null;
+        };
+        const normalizedChapters = (listCh || []).map((c, i) => toChapter(c, i)).filter(Boolean);
+        listCh = normalizedChapters;
+        setChaptersList(listCh);
+        let ch;
+        if (preferId) {
+          ch = listCh.find((c) => c && (c._id === preferId || String(c.title) === String(preferId)));
+        }
+        if (!ch) ch = listCh[0];
+        if (!ch || !ch._id) {
+          console.warn('Dashboard: No valid chapter found after normalization');
+          setIsLoading(false);
+          setHasFetched(true);
+          return;
+        }
         console.log('Dashboard: Selected chapter', ch);
+        // Track final units/map to avoid referencing out-of-scope variables later
+        let finalUnitsArr = [];
+        let finalModulesMapVar = {};
         if (ch) {
           setChapterTitle(ch.title);
           setChapterId(ch._id);
@@ -485,18 +527,18 @@ const LearnDashboard = ({ onboardingData }) => {
             if (Array.isArray(units) && units.length > 0) {
               setUnitsList(units);
             }
-            // Kick off network fetch with AbortController
+            // Fetch units for the real chapter id
             const ac = new AbortController();
             const unitsPromise = cur.listUnits(ch._id, { signal: ac.signal }).catch(() => ({ data: units || [] }));
             const unitsResp = await unitsPromise;
             units = unitsResp?.data || [];
             if (units.length > 0) saveUnitsCache(ch._id, units);
+            finalUnitsArr = units;
             console.log('Dashboard: Units found', units);
             // If chapter has no explicit units but has modules, create a virtual unit to display modules
             if (!units || units.length === 0) {
               console.log('Dashboard: No units found, checking for chapter modules...');
-              const chapterMods = await cur.listModules(ch._id);
-              const list = chapterMods?.data || [];
+              const list = ((await cur.listModules(ch._id))?.data || []);
               console.log('Dashboard: Chapter modules found', list.length);
               if (list.length > 0) {
                 const virtualUnit = { _id: `virtual-${ch._id}`, title: 'Unit 1 (Auto)', virtual: true };
@@ -523,13 +565,14 @@ const LearnDashboard = ({ onboardingData }) => {
             // Use session cache immediately for modules map
             const cachedMap = loadUnitModulesCache(ch._id);
             const nextMap = { ...cachedMap };
+            finalModulesMapVar = nextMap;
             setUnitModulesMap((prev) => ({ ...nextMap }));
 
             // Fetch each unit's modules in parallel and update state as they arrive
             const fetchPerUnit = async (u) => {
               if (u.virtual) return; // already set when virtual
               try {
-                const resp = await cur.listModulesByUnit(u._id);
+                const resp = await cur.listModulesByUnit(u._id, { signal: (new AbortController()).signal });
                 const list = resp?.data || [];
                 nextMap[u._id] = list;
                 setUnitModulesMap((prev) => {
@@ -552,6 +595,7 @@ const LearnDashboard = ({ onboardingData }) => {
               }
             });
             console.log('Dashboard: Modules map', nextMap);
+            finalModulesMapVar = { ...(finalModulesMapVar || {}), ...nextMap };
             setUnitModulesMap((prev) => ({ ...(prev || {}), ...nextMap }));
             let lastMap = {};
             try {
@@ -575,7 +619,7 @@ const LearnDashboard = ({ onboardingData }) => {
               setModulesList(cachedChosen);
               if (cachedChosen[0]) setModuleTitle(cachedChosen[0].title);
             } else {
-              const modules = await cur.listModules(ch._id);
+              const modules = await cur.listModules(ch._id, { signal: (new AbortController()).signal });
               const list = modules?.data || [];
               console.log('Dashboard: Fallback chapter modules', list);
               setModulesList(list);
@@ -614,12 +658,12 @@ const LearnDashboard = ({ onboardingData }) => {
         console.log('Dashboard: Load complete', { 
           unitsList: unitsList.length, 
           modulesList: modulesList.length,
-          finalUnits: units,
-          finalModulesMap: nextMap
+          finalUnits: finalUnitsArr,
+          finalModulesMap: finalModulesMapVar
         });
         
         // Clear immediate fallback if we loaded real data
-        if (showImmediateFallback && (units.length > 0 || modulesList.length > 0)) {
+        if (showImmediateFallback && ((finalUnitsArr && finalUnitsArr.length > 0) || modulesList.length > 0)) {
           console.log('Dashboard: Clearing immediate fallback, real data loaded');
           setShowImmediateFallback(false);
         }
@@ -628,7 +672,24 @@ const LearnDashboard = ({ onboardingData }) => {
         setHasFetched(true);
       } catch (e) {
         console.error("Error loading dashboard data:", e);
-        // Ensure UI becomes interactive even on failure
+        // Fallback: render a minimal dummy path so the UI is usable even on errors
+        try {
+          const dummyChapter = { _id: 'dummy-chapter', title: 'Welcome to Learning!', subjectId: null, order: 1 };
+          const dummyUnit = { _id: 'dummy-unit', title: 'Unit 1 (Welcome)', virtual: true };
+          const dummyModules = [
+            { _id: 'dummy-module-1', title: 'Getting Started', order: 1 },
+            { _id: 'dummy-module-2', title: 'First Lesson', order: 2 },
+            { _id: 'dummy-module-3', title: 'Practice Time', order: 3 },
+          ];
+          setChaptersList([dummyChapter]);
+          setChapterId(dummyChapter._id);
+          setChapterTitle(dummyChapter.title);
+          setUnitsList([dummyUnit]);
+          setUnitTitle(dummyUnit.title);
+          setUnitModulesMap({ [dummyUnit._id]: dummyModules });
+          setModulesList(dummyModules);
+          setModuleTitle(dummyModules[0].title);
+        } catch (_) {}
         setIsLoading(false);
         setHasFetched(true);
       }

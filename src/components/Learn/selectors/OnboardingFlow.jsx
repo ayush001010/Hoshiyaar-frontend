@@ -35,7 +35,7 @@ export default function OnboardingFlow() {
         updateData={updateData}
         onContinue={() => setData((d)=>({ ...d }))}
         onBack={() => navigate('/login')}
-        autoAdvance={true}
+        autoAdvance={false}
       />
     );
   }
@@ -46,7 +46,7 @@ export default function OnboardingFlow() {
         updateData={updateData}
         onContinue={() => setData((d)=>({ ...d }))}
         onBack={() => updateData({ board: '' })}
-        autoAdvance={true}
+        autoAdvance={false}
       />
     );
   }

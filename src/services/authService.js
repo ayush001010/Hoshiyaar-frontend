@@ -13,35 +13,42 @@ console.log('API_URL:', API_URL);
 console.log('Environment:', import.meta.env.DEV ? 'development' : 'production');
 console.log('BASE:', BASE);
 
+// Centralized axios instance with timeout
+const http = axios.create({
+  baseURL: API_URL,
+  timeout: 12000,
+  withCredentials: false,
+});
+
 // Register user (username-based)
-const register = (userData) => {
-  return axios.post(API_URL + 'register', userData);
+const register = (userData, opts) => {
+  return http.post('register', userData, opts);
 };
 
 // Login user with username
-const login = (userData) => {
-  return axios.post(API_URL + 'login', userData);
+const login = (userData, opts) => {
+  return http.post('login', userData, opts);
 };
 
 // Update onboarding selections
-const updateOnboarding = (data) => {
-  return axios.put(API_URL + 'onboarding', data);
+const updateOnboarding = (data, opts) => {
+  return http.put('onboarding', data, opts);
 };
 
 // Update profile (alias to onboarding update for now)
-const updateProfile = (data) => axios.put(API_URL + 'onboarding', data);
+const updateProfile = (data, opts) => http.put('onboarding', data, opts);
 
 // Get user data
-const getUser = (userId) => {
-  return axios.get(API_URL + 'user/' + userId);
+const getUser = (userId, opts) => {
+  return http.get('user/' + userId, opts);
 };
 
 // Progress APIs
-const getProgress = (userId) => axios.get(API_URL + 'progress/' + userId);
-const updateProgress = (data) => axios.put(API_URL + 'progress', data);
+const getProgress = (userId, opts) => http.get('progress/' + userId, opts);
+const updateProgress = (data, opts) => http.put('progress', data, opts);
 
 // Username availability
-const checkUsername = (username) => axios.get(API_URL + 'check-username', { params: { username } });
+const checkUsername = (username, opts) => http.get('check-username', { params: { username }, ...(opts || {}) });
 
 // Export the functions
 const authService = {

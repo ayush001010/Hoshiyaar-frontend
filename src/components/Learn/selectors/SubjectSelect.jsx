@@ -17,7 +17,7 @@ const BackArrow = ({ onClick }) => (
 );
 
 
-const SubjectSelect = ({ onContinue, onBack, updateData, selectedBoard = 'CBSE', autoAdvance = true }) => {
+const SubjectSelect = ({ onContinue, onBack, updateData, selectedBoard, autoAdvance = false }) => {
     const [selectedSubject, setSelectedSubject] = useState(null);
     const [subjects, setSubjects] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -31,22 +31,22 @@ const SubjectSelect = ({ onContinue, onBack, updateData, selectedBoard = 'CBSE',
     };
 
     useEffect(() => {
+        if (!selectedBoard) {
+            setSubjects([]);
+            setLoading(false);
+            return;
+        }
         const loadSubjects = async () => {
             try {
                 // Hydrate from cache first for instant paint
-                const cached = loadCache(selectedBoard || 'CBSE');
+                const cached = loadCache(selectedBoard);
                 if (cached.length > 0) setSubjects(cached);
                 // Fetch subjects for the selected board
-                const res = await curriculumService.listSubjects(selectedBoard || 'CBSE');
+                const res = await curriculumService.listSubjects(selectedBoard);
                 const names = (res?.data || []).map(s => s.name);
                 setSubjects(names);
-                if (names && names.length > 0) saveCache(selectedBoard || 'CBSE', names);
-                if (autoAdvance && names.length === 1) {
-                    const only = names[0];
-                    setSelectedSubject(only);
-                    updateData?.({ subject: only });
-                    setTimeout(() => onContinue?.(), 0);
-                }
+                if (names && names.length > 0) saveCache(selectedBoard, names);
+                // Manual selection only - no auto-selection
             } catch (_) {
                 setSubjects([]);
             } finally {
@@ -90,14 +90,13 @@ const SubjectSelect = ({ onContinue, onBack, updateData, selectedBoard = 'CBSE',
                                 key={subject}
                                 onClick={async () => { 
                                     setSelectedSubject(subject); 
-                                    updateData?.({ subject }); 
                                     // Step-ahead prefetch: chapters for chosen subject
                                     try {
                                         const res = await curriculumService.listChapters(selectedBoard || 'CBSE', subject);
                                         const list = (res?.data || []).map((c, idx) => ({ id: c._id, name: c.title, order: c.order ?? idx + 1 }));
                                         try { sessionStorage.setItem(`chapters_cache_v1__${selectedBoard || 'CBSE'}__${subject}`, JSON.stringify(list || [])); } catch(_) {}
                                     } catch (_) {}
-                                    if (autoAdvance) setTimeout(() => onContinue?.(), 0); 
+                                    // Manual selection only - no auto-advance
                                 }}
                                 className={`p-8 text-center rounded-2xl border-2 text-xl font-extrabold transition-colors ${
                                     selectedSubject === subject 

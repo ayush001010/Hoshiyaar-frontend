@@ -15,7 +15,7 @@ const Welcome = ({ onContinue }) => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        if (user?._id && (user?.onboardingCompleted || (user?.board && user?.subject))) {
+        if (user?._id && user?.onboardingCompleted) {
             navigate('/learn', { replace: true });
         }
     }, [user, navigate]);
