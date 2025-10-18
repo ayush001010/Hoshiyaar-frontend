@@ -23,6 +23,7 @@ export default defineConfig({
       },
     },
   },
+  base: './', // This fixes the path issue for S3
   // Add SPA fallback for development
   preview: {
     port: 4173,
