@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useReview } from '../../../context/ReviewContext.jsx';
+import { useAuth } from '../../../context/AuthContext.jsx';
 import image07 from '../../../assets/images/image-07.png';
 import reattemptImg from '../../../assets/images/reattempt.png';
 import finishImg from '../../../assets/images/finish.png';
@@ -11,10 +12,48 @@ const LessonComplete = () => {
   const { moduleNumber } = useParams();
   const [isChecking, setIsChecking] = useState(true);
   const { hasItems } = useReview();
+  const { user } = useAuth();
+  const [scores, setScores] = useState({ best: 0, last: 0 });
+  const isNewBest = Math.max(0, Number(scores.last || 0)) >= Math.max(0, Number(scores.best || 0)) && (scores.last || 0) > 0;
+  const [showConfetti, setShowConfetti] = useState(false);
 
   useEffect(() => {
-    setIsChecking(false);
-  }, []);
+    (async () => {
+      try {
+        if (user?._id) {
+          const auth = (await import('../../../services/authService.js')).default;
+          const resp = await auth.getProgress(user._id);
+          const arr = resp?.data || [];
+          const params = new URLSearchParams(window.location.search);
+          const chapParam = params.get('chapter');
+          const np = Number(chapParam);
+          const chapterToShow = Number.isFinite(np) && np > 0 ? np : 1;
+          const entry = arr.find((e) => Number(e.chapter) === Number(chapterToShow));
+          if (entry) {
+            // Sum across all lesson stats in this chapter to avoid title mismatches
+            const stats = entry.stats || {};
+            const kv = typeof stats.entries === 'function' ? Array.from(stats.entries()) : Object.entries(stats);
+            let best = 0, last = 0;
+            for (const [, v] of kv) {
+              const b = Number(v?.bestScore || 0);
+              const l = Number(v?.lastScore || 0);
+              if (Number.isFinite(b)) best += b;
+              if (Number.isFinite(l)) last += l;
+            }
+            setScores({ best, last });
+          }
+        }
+      } catch (_) {}
+      setIsChecking(false);
+    })();
+  }, [user, moduleNumber]);
+
+  useEffect(() => {
+    if (isNewBest) {
+      setShowConfetti(true);
+      try { setTimeout(() => setShowConfetti(false), 1600); } catch (_) {}
+    }
+  }, [isNewBest]);
 
   // Play victory sound only when there are no review items (final page)
   useEffect(() => {
@@ -63,7 +102,7 @@ const LessonComplete = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-16 py-2 text-center">
+    <div className="h-screen bg-white flex flex-col items-center justify-between px-6 sm:px-10 md:px-12 py-4 text-center overflow-hidden">
       
       {hasItems ? (
         <>
@@ -84,10 +123,40 @@ const LessonComplete = () => {
       ) : (
         <>
           {/* Finish character above sentence (Duolingo-style) */}
-          <img src={finishImg} alt="Finish" className="w-96 h-96 md:w-[28rem] md:h-[28rem] object-contain select-none mb-4" />
-          <p className="mt-1 text-3xl md:text-4xl text-gray-900 font-extrabold max-w-4xl">You rocked this lesson. Ready for the next adventure?</p>
-          <div className="mt-8">
-            <button onClick={handleContinue} className="w-[10] py-6 px-8 rounded-2xl bg-blue-600 text-white font-extrabold text-2xl hover:bg-blue-700 transition-colors shadow-[0_8px_0_0_rgba(0,0,0,0.15)] whitespace-nowrap">Continue Learning</button>
+          <img src={finishImg} alt="Finish" className="max-h-[28vh] w-auto object-contain select-none mt-2" />
+          {showConfetti && (
+            <div className="pointer-events-none absolute top-10 right-10 w-36 h-36">
+              <div className="absolute text-3xl animate-bounce" style={{ top: 0, right: 8 }}>🎉</div>
+              <div className="absolute text-3xl animate-bounce" style={{ top: 26, right: 56, animationDelay: '0.15s' }}>✨</div>
+              <div className="absolute text-3xl animate-bounce" style={{ top: 10, right: 86, animationDelay: '0.3s' }}>🎊</div>
+              <div className="absolute text-3xl animate-bounce" style={{ top: 46, right: 24, animationDelay: '0.45s' }}>⭐</div>
+            </div>
+          )}
+          <p className="mt-1 text-2xl md:text-3xl text-gray-900 font-extrabold max-w-4xl px-2">You rocked this lesson. Ready for the next adventure?</p>
+          {/* Kid-friendly score card */}
+          <div className="mt-3 w-full max-w-xl">
+            <div className="relative w-full rounded-3xl border-4 border-yellow-300 shadow-[0_10px_0_0_rgba(0,0,0,0.1)] overflow-hidden"
+                 style={{ background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)' }}>
+              <div className="flex items-center gap-4 p-4 md:p-5">
+                <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center bg-yellow-200 border-4 border-yellow-300 shadow-inner">
+                  <svg viewBox="0 0 24 24" className="w-10 h-10 text-yellow-500">
+                    <path fill="currentColor" d="M12 2.75l2.95 5.98 6.6.96-4.78 4.66 1.13 6.58L12 18.77l-5.9 3.16 1.13-6.58L2.45 9.69l6.6-.96L12 2.75z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <div className="text-xl md:text-2xl font-extrabold text-yellow-700">You earned {Math.max(0, Number(scores.last||0))} stars!</div>
+                  <div className="text-sm md:text-base font-bold text-yellow-800/90 mt-0.5">Best for this lesson: {Math.max(0, Number(scores.best||0))}</div>
+                </div>
+                {isNewBest && (
+                  <div className="absolute -top-3 -right-3 rotate-6">
+                    <span className="px-2.5 py-1 rounded-xl bg-pink-500 text-white text-xs md:text-sm font-extrabold shadow-md">NEW HIGH SCORE ✨</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="mb-2 mt-3">
+            <button onClick={handleContinue} className="py-4 px-6 rounded-2xl bg-blue-600 text-white font-extrabold text-xl hover:bg-blue-700 transition-colors shadow-[0_6px_0_0_rgba(0,0,0,0.15)] whitespace-nowrap">Continue Learning</button>
           </div>
         </>
       )}

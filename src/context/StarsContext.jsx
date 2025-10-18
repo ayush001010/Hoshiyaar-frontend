@@ -9,6 +9,8 @@ export const useStars = () => {
 };
 
 const STORAGE_KEY = 'hs_stars_total_v1';
+const STORAGE_PER_MODULE_KEY = 'hs_stars_per_module_v1';
+const STORAGE_PER_QUESTION_KEY = 'hs_stars_per_question_v1';
 
 export const StarsProvider = ({ children }) => {
   const [stars, setStars] = useState(() => {
@@ -22,10 +24,27 @@ export const StarsProvider = ({ children }) => {
   });
   const [delta, setDelta] = useState(0); // for +5 / -2 flyout
   const timerRef = useRef(null);
+  // Track cumulative per-module stars
+  const [moduleStars, setModuleStars] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_PER_MODULE_KEY) || '{}') || {}; } catch (_) { return {}; }
+  });
+  // Track per-question attempts to make scoring idempotent
+  // Structure: { [questionId]: { correct: boolean, penalized: boolean, pointsAwarded: number, moduleId: string } }
+  const [questionLedger, setQuestionLedger] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_PER_QUESTION_KEY) || '{}') || {}; } catch (_) { return {}; }
+  });
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, String(stars)); } catch (_) {}
   }, [stars]);
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_PER_MODULE_KEY, JSON.stringify(moduleStars)); } catch (_) {}
+  }, [moduleStars]);
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_PER_QUESTION_KEY, JSON.stringify(questionLedger)); } catch (_) {}
+  }, [questionLedger]);
 
   const addStars = (amount) => {
     if (!Number.isFinite(amount) || amount === 0) return;
@@ -35,7 +54,63 @@ export const StarsProvider = ({ children }) => {
     timerRef.current = setTimeout(() => setDelta(0), 1200);
   };
 
-  const value = useMemo(() => ({ stars, addStars, delta }), [stars, delta]);
+  // Idempotent scoring helpers per question
+  const awardCorrect = (moduleId, questionId, points) => {
+    if (!moduleId || !questionId || !Number.isFinite(points) || points <= 0) return;
+    setQuestionLedger((prev) => {
+      const entry = prev[questionId] || { correct: false, penalized: false, pointsAwarded: 0, moduleId };
+      if (entry.correct) {
+        return prev; // already counted best result
+      }
+      const deltaPts = Math.max(0, points - (entry.pointsAwarded || 0)); // grant only the improvement
+      if (deltaPts > 0) {
+        setStars((s) => s + deltaPts);
+        setModuleStars((m) => ({ ...m, [moduleId]: (m[moduleId] || 0) + deltaPts }));
+        setDelta(deltaPts);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => setDelta(0), 1200);
+      }
+      const next = { ...prev, [questionId]: { ...entry, correct: true, pointsAwarded: Math.max(entry.pointsAwarded || 0, points) } };
+      return next;
+    });
+  };
+
+  const awardWrong = (moduleId, questionId, penalty, { isRetry = false } = {}) => {
+    if (!moduleId || !questionId || !Number.isFinite(penalty) || penalty >= 0) return;
+    setQuestionLedger((prev) => {
+      const entry = prev[questionId] || { correct: false, penalized: false, pointsAwarded: 0, moduleId };
+      // Do not penalize on retry, and only penalize once on the first wrong attempt
+      if (isRetry || entry.penalized || entry.correct) return prev;
+      setStars((s) => Math.max(0, s + penalty));
+      setModuleStars((m) => ({ ...m, [moduleId]: Math.max(0, (m[moduleId] || 0) + penalty) }));
+      setDelta(penalty);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setDelta(0), 1200);
+      const next = { ...prev, [questionId]: { ...entry, penalized: true } };
+      return next;
+    });
+  };
+
+  const getModuleStars = (moduleId) => moduleStars[moduleId] || 0;
+
+  const resetModuleLedger = (moduleId) => {
+    if (!moduleId) return;
+    setModuleStars((m) => ({ ...m, [moduleId]: 0 }));
+    setQuestionLedger((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((qid) => { if (next[qid]?.moduleId === moduleId) delete next[qid]; });
+      return next;
+    });
+  };
+
+  const resetAllStars = () => {
+    setStars(0);
+    setModuleStars({});
+    setQuestionLedger({});
+    setDelta(0);
+  };
+
+  const value = useMemo(() => ({ stars, addStars, delta, awardCorrect, awardWrong, getModuleStars, resetModuleLedger, resetAllStars }), [stars, delta, moduleStars, questionLedger]);
   return <StarsContext.Provider value={value}>{children}</StarsContext.Provider>;
 };
 

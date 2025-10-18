@@ -11,7 +11,7 @@ import { useModuleItems } from '../../../hooks/useModuleItems';
 import authService from '../../../services/authService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useReview } from '../../../context/ReviewContext.jsx';
-import { useStars, StarCounter } from '../../../context/StarsContext.jsx';
+import { useStars } from '../../../context/StarsContext.jsx';
 // Inline feedback bar instead of modal
 
 export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
@@ -50,7 +50,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
   const actualReviewMode = isReviewMode || isReviewModeFromUrl;
   const { user } = useAuth();
   const { add: addToReview, removeActive, requeueActive } = useReview();
-  const { addStars } = useStars();
+  const { awardCorrect, awardWrong } = useStars();
   const [feedback, setFeedback] = useState({ open: false, correct: false, expected: '' });
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [showResult, setShowResult] = useState(false);
@@ -99,6 +99,20 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
   // Allow native browser back (no intercept)
   useEffect(() => {}, []);
 
+  // Reset server-side lesson score at entry
+  useEffect(() => {
+    (async () => {
+      try {
+        if (user?._id) {
+          const params = new URLSearchParams(window.location.search);
+          const title = params.get('title') || item?.title || `Module ${moduleNumber}`;
+          await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: title, isCorrect: true, deltaScore: 0, resetLesson: true });
+        }
+      } catch (_) {}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduleNumber]);
+
   // Disable Enter key triggering selection on MCQ pages
   useEffect(() => {
     const onKey = (e) => {
@@ -145,8 +159,11 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
     if (correct) {
       setHasAnsweredCorrectly(true);
       setShowTryAgainOption(false); // Hide try again when correct
-      // scoring: +5 normally, +10 in revision
-      addStars(actualReviewMode ? 10 : 5);
+      // Idempotent per-question scoring
+      const qid = `${moduleNumber}_${index}_mcq`;
+      const pts = actualReviewMode ? 10 : 5;
+      awardCorrect(String(moduleNumber), qid, pts);
+      try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: true, deltaScore: pts }); } catch (_) {}
       
       // If in review mode, notify and go back to module
       if (actualReviewMode) {
@@ -158,7 +175,11 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
       setShowTryAgainOption(false);
       setShowIncorrectModal(true);
       // scoring penalty
-      if (!actualReviewMode) addStars(-2);
+      if (!actualReviewMode) {
+        const qid = `${moduleNumber}_${index}_mcq`;
+        awardWrong(String(moduleNumber), qid, -2, { isRetry: false });
+        try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: false, deltaScore: 0 }); } catch (_) {}
+      }
       const questionId = `${moduleNumber}_${index}_multiple-choice`;
       if (!actualReviewMode) {
         addToReview({ questionId, moduleNumber, index, type: 'multiple-choice' });
@@ -222,7 +243,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
         // Store by module id
         recordCompletedId(moduleNumber);
       } catch (_) {}
-      return navigate('/lesson-complete');
+      return navigate(`/lesson-complete?chapter=${encodeURIComponent(moduleNumber)}`);
     }
     navigate(`${routeForType(nextItem.type, nextIndex)}${suffix}`);
   }
@@ -282,7 +303,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
             </div>
           )}
           
-          <StarCounter />
+          {/* Score counter removed per new rules */}
         </div>
       </div>
 
@@ -490,18 +511,6 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
               {isCorrect ? 'Great job!' : 'Not quite right.'}
             </div>
             <div className="flex gap-3">
-              {/* Show Try Again button ONLY for incorrect answers */}
-              {!isCorrect && showTryAgainOption && (
-                <button
-                  onClick={() => {
-                    console.log('[MCQ DEBUG] Try Again button clicked');
-                    handleTryAgain();
-                  }}
-                  className="px-6 py-3 rounded-2xl text-white font-extrabold text-lg bg-orange-600 hover:bg-orange-700 transition-colors"
-                >
-                  Try Again
-                </button>
-              )}
               {/* Show Continue button ONLY for correct answers */}
               {isCorrect && (
                 <button

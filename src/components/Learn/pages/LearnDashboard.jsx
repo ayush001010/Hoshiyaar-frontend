@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import heroChar from "../../../assets/images/heroChar.png";
 import RevisionStar from "../quiz/RevisionStar.jsx";
 import { ReviewProvider } from "../../../context/ReviewContext.jsx";
+import { useStars } from '../../../context/StarsContext.jsx';
 import chapterImg from "../../../assets/images/chapterImg.png";
 
 // --- SVG Icons for the Dashboard ---
@@ -128,6 +129,7 @@ const PathNode = ({ status, onClick, disabled, offset = 0, color = "#2C6DEF", li
 
 const LearnDashboard = ({ onboardingData }) => {
   const { logout, user, loading: authLoading } = useAuth();
+  const { resetModuleLedger } = useStars();
   const navigate = useNavigate();
   const [progress, setProgress] = useState([]);
   const [chapterTitle, setChapterTitle] = useState("");
@@ -618,12 +620,15 @@ const LearnDashboard = ({ onboardingData }) => {
             if (cachedChosen.length > 0) {
               setModulesList(cachedChosen);
               if (cachedChosen[0]) setModuleTitle(cachedChosen[0].title);
+              // Reset per-module ledger when opening a new module list
+              try { const mid = cachedChosen[0]?._id; if (mid) resetModuleLedger(String(mid)); } catch (_) {}
             } else {
               const modules = await cur.listModules(ch._id, { signal: (new AbortController()).signal });
               const list = modules?.data || [];
               console.log('Dashboard: Fallback chapter modules', list);
               setModulesList(list);
               if (list[0]) setModuleTitle(list[0].title);
+              try { const mid = list[0]?._id; if (mid) resetModuleLedger(String(mid)); } catch (_) {}
             }
             // Safety: if units exist but chosenList is empty and chapter modules are also empty, avoid blank state by picking any first non-empty unit list
             if (units.length > 0 && (!modulesList || modulesList.length === 0)) {

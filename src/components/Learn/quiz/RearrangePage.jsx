@@ -6,7 +6,7 @@ import IncorrectAnswerModal from '../../modals/IncorrectAnswerModal.jsx';
 import authService from '../../../services/authService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useReview } from '../../../context/ReviewContext.jsx';
-import { useStars, StarCounter } from '../../../context/StarsContext.jsx';
+import { useStars } from '../../../context/StarsContext.jsx';
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useModuleItems } from '../../../hooks/useModuleItems';
@@ -21,6 +21,29 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
   const index = Number(indexParam || 0);
   const { items, loading, error } = useModuleItems(moduleNumber);
   const item = useMemo(() => items[index] || null, [items, index]);
+  // Local cache writers so dashboard star updates immediately on completion
+  const LS_KEY = 'lesson_progress_v1';
+  const markCompletedLocal = (chapterZeroIdx) => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      const store = raw ? JSON.parse(raw) : {};
+      const key = 'default';
+      const set = new Set(store[key] || []);
+      if (Number.isInteger(chapterZeroIdx) && chapterZeroIdx >= 0) set.add(chapterZeroIdx);
+      store[key] = Array.from(set);
+      localStorage.setItem(LS_KEY, JSON.stringify(store));
+    } catch (_) {}
+  };
+  const IDS_KEY = 'lesson_completed_ids_v1';
+  const recordCompletedId = (moduleId) => {
+    try {
+      const raw = localStorage.getItem(IDS_KEY);
+      const arr = raw ? JSON.parse(raw) : [];
+      const set = new Set(arr);
+      if (moduleId) set.add(String(moduleId));
+      localStorage.setItem(IDS_KEY, JSON.stringify(Array.from(set)));
+    } catch (_) {}
+  };
   
   // Check if we're in review mode from URL params
   const urlParams = new URLSearchParams(window.location.search);
@@ -119,6 +142,20 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
 
   // Allow browser back
   useEffect(() => {}, []);
+
+  // Reset server-side lesson score at entry so lastScore starts at 0 per run
+  useEffect(() => {
+    (async () => {
+      try {
+        if (user?._id) {
+          const params = new URLSearchParams(window.location.search);
+          const title = params.get('title') || item?.title || `Module ${moduleNumber}`;
+          await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: title, isCorrect: true, deltaScore: 0, resetLesson: true });
+        }
+      } catch (_) {}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduleNumber]);
 
   // Enter to submit/continue
   useEffect(() => {
@@ -249,7 +286,8 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       playCorrectSound();
       setHasAnsweredCorrectly(true);
       setShowTryAgainOption(false); // Hide try again when correct
-      addStars(actualReviewMode ? 10 : 5);
+      const pts = actualReviewMode ? 10 : 5;
+      try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: true, deltaScore: pts }); } catch (_) {}
       
       if (actualReviewMode) {
         removeActive();
@@ -260,7 +298,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       // Immediate feedback and enqueue for review
       setShowTryAgainOption(false);
       setShowIncorrectModal(true);
-      if (!actualReviewMode) addStars(-2);
+      try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: false, deltaScore: 0 }); } catch (_) {}
       const questionId = `${moduleNumber}_${index}_rearrange`;
       if (!actualReviewMode) {
         addToReview({ questionId, moduleNumber, index, type: 'rearrange' });
@@ -313,7 +351,13 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       try { 
         if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), conceptCompleted: true }); 
       } catch (_) {}
-      return navigate('/lesson-complete');
+      // Update local caches so dashboard updates without refresh
+      try {
+        const zeroIdx = Number(moduleNumber) - 1;
+        markCompletedLocal(zeroIdx);
+        recordCompletedId(moduleNumber);
+      } catch (_) {}
+      return navigate(`/lesson-complete?chapter=${encodeURIComponent(moduleNumber)}`);
     }
     navigate(`${routeForType(nextItem.type, nextIndex)}${suffix}`);
   }
@@ -376,7 +420,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
             </div>
           )}
           
-          <StarCounter />
+          {/* Score counter removed per new rules */}
         </div>
       </div>
 
@@ -490,7 +534,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       </div>
 
       {/* Inline Duolingo-style feedback bar - show for both correct and incorrect answers */}
-      {showResult && !actualReviewMode && (
+      {showResult && !actualReviewMode && isCorrect && (
         <div className={`fixed left-0 right-0 bottom-0 z-50 border-t-4 shadow-2xl ${
           isCorrect ? 'bg-green-50 border-green-400' : 'bg-red-50 border-red-400'
         }`}>
@@ -502,7 +546,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
             </div>
             <div className="flex gap-3">
               {/* Show Try Again button ONLY for incorrect answers */}
-              {!isCorrect && showTryAgainOption && (
+              {!isCorrect && (
                 <button
                   onClick={() => {
                     console.log('[Rearrange DEBUG] Try Again button clicked');
@@ -514,7 +558,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
                 </button>
               )}
               {/* Show Continue button ONLY for correct answers */}
-              {isCorrect && (
+              {isCorrect && !showIncorrectModal && (
                 <button
                   onClick={handleNext}
                   className="px-8 py-3 rounded-2xl text-white font-extrabold text-xl bg-green-600 hover:bg-green-700 transition-colors"
