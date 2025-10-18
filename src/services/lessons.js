@@ -1,4 +1,4 @@
-const API_BASE = import.meta?.env?.VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : '');
+const API_BASE = import.meta?.env?.VITE_API_BASE || 'http://hoshi-backend-env.eba-t92ieqn2.ap-southeast-2.elasticbeanstalk.com';
 
 // Fetch items for a module by its ObjectId (from curriculum flow)
 export async function fetchLessonItemsByModule(moduleId) {

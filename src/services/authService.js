@@ -5,7 +5,7 @@ import axios from 'axios';
 // In production, allow overriding with VITE_API_BASE, otherwise fall back to current origin
 const BASE = import.meta.env.DEV
   ? ''
-  : (import.meta.env.VITE_API_BASE || 'https://hoshiyaar-backend.onrender.com');
+  : (import.meta.env.VITE_API_BASE || 'http://hoshi-backend-env.eba-t92ieqn2.ap-southeast-2.elasticbeanstalk.com');
 const API_URL = `${BASE}/api/auth/`;
 
 // Debug logging

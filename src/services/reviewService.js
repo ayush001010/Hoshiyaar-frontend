@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Prefer Vite proxy on localhost; use VITE_API_BASE or current origin in non-local envs
 const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)/.test(window.location.hostname);
-const API = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : ''));
+const API = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || 'http://hoshi-backend-env.eba-t92ieqn2.ap-southeast-2.elasticbeanstalk.com');
 
 const reviewService = {
   async listIncorrect(userId, moduleId, chapterId) {
