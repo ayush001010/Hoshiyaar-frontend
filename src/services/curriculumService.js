@@ -1,8 +1,26 @@
 import axios from 'axios';
 
 // Prefer Vite proxy on localhost; use VITE_API_BASE or current origin in non-local envs
-const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)/.test(window.location.hostname);
-const API = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || 'http://hoshi-backend-env.eba-t92ieqn2.ap-southeast-2.elasticbeanstalk.com');
+// For mobile access on local network, use the local IP
+const getAPIBase = () => {
+  if (typeof window === 'undefined') return '';
+  
+  const hostname = window.location.hostname;
+  const isLocalhost = /^(localhost|127\.0\.0\.1)/.test(hostname);
+  
+  if (isLocalhost) {
+    return ''; // Use Vite proxy in development
+  }
+  
+  // Check if we're accessing from mobile on local network
+  if (hostname === '192.168.1.11') {
+    return 'http://192.168.1.11:5000'; // Local network backend
+  }
+  
+  return import.meta.env.VITE_API_BASE || '';
+};
+
+const API = getAPIBase();
 
 // Centralized axios instance with sane defaults to avoid hanging requests
 const http = axios.create({

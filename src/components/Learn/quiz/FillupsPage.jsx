@@ -5,7 +5,7 @@ import IncorrectAnswerModal from '../../modals/IncorrectAnswerModal.jsx';
 import authService from '../../../services/authService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useReview } from '../../../context/ReviewContext.jsx';
-import { useStars } from '../../../context/StarsContext.jsx';
+import { useStars, StarCounter } from '../../../context/StarsContext.jsx';
 // Inline feedback bar instead of modal
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -61,6 +61,8 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
   const [isFlagged] = useState(false);
   const [showTryAgainOption, setShowTryAgainOption] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  // Track first attempt per question instance; re-attempts award 0
+  const [hasAttempted, setHasAttempted] = useState(false);
 
   const correctAudio = useRef(null);
   const errorAudio = useRef(null);
@@ -87,6 +89,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
     setShowIncorrectModal(false);
     setHasAnsweredCorrectly(false);
     setShowTryAgainOption(false);
+    setHasAttempted(false);
     // Focus input on new question
     const id = setTimeout(() => {
       try { if (inputRef.current) inputRef.current.focus(); } catch (_) {}
@@ -163,17 +166,20 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
     
     setIsCorrect(correct);
     setShowResult(true);
+    const isFirstAttempt = !hasAttempted;
+    if (!hasAttempted) setHasAttempted(true);
 
     try { (correct ? correctAudio : errorAudio)?.current?.play?.(); } catch (_) {}
 
     if (correct) {
       setHasAnsweredCorrectly(true);
       setShowTryAgainOption(false); // Hide try again when correct
-      // Idempotent: only count once per question
-      const qid = `${moduleNumber}_${index}_fillups`;
-      const pts = actualReviewMode ? 10 : 5;
-      awardCorrect(String(moduleNumber), qid, pts);
-      try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: true, deltaScore: pts }); } catch (_) {}
+      if (isFirstAttempt) {
+        const qid = `${moduleNumber}_${index}_fillups`;
+        const pts = 5;
+        if (pts !== 0) awardCorrect(String(moduleNumber), qid, pts);
+        try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: true, deltaScore: pts }); } catch (_) {}
+      }
       
       if (actualReviewMode) {
         removeActive();
@@ -183,11 +189,10 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
       // Immediate feedback and enqueue for review
       setShowTryAgainOption(false);
       setShowIncorrectModal(true);
-      if (!actualReviewMode) {
+      if (isFirstAttempt && !actualReviewMode) {
         const qid = `${moduleNumber}_${index}_fillups`;
-        // Penalize only once; no additional negatives on revisit
         awardWrong(String(moduleNumber), qid, -2, { isRetry: false });
-        try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: false, deltaScore: 0 }); } catch (_) {}
+        try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: false, deltaScore: -2 }); } catch (_) {}
       }
       const questionId = `${moduleNumber}_${index}_fill-in-the-blank`;
       if (!actualReviewMode) {
@@ -247,6 +252,27 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
         const zeroIdx = Number(moduleNumber) - 1;
         markCompletedLocal(zeroIdx);
         recordCompletedId(moduleNumber);
+        // Also store in user-scoped keys for dashboard compatibility
+        try {
+          const userScopedKey = (base) => `${base}__${user?._id || 'anon'}`;
+          const userLS_KEY = userScopedKey('lesson_progress_v1');
+          const userIDS_KEY = userScopedKey('lesson_completed_ids_v1');
+          
+          // Update user-scoped progress
+          const userRaw = localStorage.getItem(userLS_KEY);
+          const userStore = userRaw ? JSON.parse(userRaw) : {};
+          const userSet = new Set(userStore['default'] || []);
+          userSet.add(zeroIdx);
+          userStore['default'] = Array.from(userSet);
+          localStorage.setItem(userLS_KEY, JSON.stringify(userStore));
+          
+          // Update user-scoped completed IDs
+          const userIdsRaw = localStorage.getItem(userIDS_KEY);
+          const userIdsArr = userIdsRaw ? JSON.parse(userIdsRaw) : [];
+          const userIdsSet = new Set(userIdsArr);
+          userIdsSet.add(String(moduleNumber));
+          localStorage.setItem(userIDS_KEY, JSON.stringify(Array.from(userIdsSet)));
+        } catch (_) {}
       } catch (_) {}
       return navigate(`/lesson-complete?chapter=${encodeURIComponent(moduleNumber)}`);
     }
@@ -287,9 +313,9 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
   if (item.type !== 'fill-in-the-blank') return <div className="p-6">No fill-in-the-blank at this step.</div>;
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 sm:p-4">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
+      {/* Header - reduced padding for mobile */}
+      <div className="flex items-center justify-between p-2 sm:p-3 md:p-4 flex-shrink-0">
         {!actualReviewMode && (
           <button 
             onClick={() => setShowExitConfirm(true)}
@@ -298,10 +324,10 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
             ✕
           </button>
         )}
-        <div className="flex-1 mx-2 sm:mx-4">
+        <div className="flex-1 mx-1 sm:mx-2 md:mx-4">
           <ProgressBar currentIndex={index} total={items.length} />
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
           
           {/* Show flagged status */}
           {isFlagged && (
@@ -311,13 +337,13 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
             </div>
           )}
           
-          {/* Score counter removed per new rules */}
+          <StarCounter />
         </div>
       </div>
 
-      {/* Main Content - responsive text and spacing */}
-      <div className="flex-1 flex flex-col items-center px-3 sm:px-4 md:px-6">
-        <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-gray-900 text-center mt-4 sm:mt-6 md:mt-8 mb-2 sm:mb-3 md:mb-4 text-overflow-fix px-2">
+      {/* Main Content - optimized for mobile with reduced spacing */}
+      <div className="flex-1 flex flex-col items-center px-2 sm:px-3 md:px-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+        <h2 className="text-xl sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-extrabold text-gray-900 text-center mt-2 sm:mt-6 md:mt-8 mb-2 sm:mb-3 md:mb-4 text-overflow-fix px-1 sm:px-2">
           {item.question}
         </h2>
 
@@ -328,17 +354,17 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
           const list = imgs.length > 0 ? imgs : primary;
           if (list.length === 0) {
             return (
-              <div className="w-full max-w-xl sm:max-w-2xl md:max-w-3xl h-40 sm:h-60 md:h-72 rounded-2xl sm:rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center mb-2 sm:mb-3 md:mb-4">
+              <div className="w-full max-w-xl sm:max-w-2xl md:max-w-3xl h-32 sm:h-40 md:h-60 rounded-2xl sm:rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center mb-1 sm:mb-3 md:mb-4">
                 <span className="text-gray-400 text-sm sm:text-base">Image</span>
               </div>
             );
           }
           return (
-            <div className="w-full max-w-xl sm:max-w-2xl md:max-w-3xl mb-2 sm:mb-3 flex justify-center">
-              <div className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-5">
+            <div className="w-full max-w-xl sm:max-w-2xl md:max-w-3xl mb-1 sm:mb-3 flex justify-center">
+              <div className="flex flex-wrap justify-center gap-1 sm:gap-3 md:gap-5">
                 {list.slice(0, 5).map((src, i) => (
-                  <div key={i} className="border border-blue-300 rounded-xl sm:rounded-2xl p-2 sm:p-3 bg-white shadow-sm">
-                    <img src={src} alt={`fillup-${i}`} className="h-28 w-20 sm:h-40 sm:w-28 md:h-52 md:w-40 lg:h-64 lg:w-48 object-contain rounded-lg sm:rounded-xl" />
+                  <div key={i} className="border border-blue-300 rounded-xl sm:rounded-2xl p-1 sm:p-3 bg-white shadow-sm">
+                    <img src={src} alt={`fillup-${i}`} className="h-36 w-28 sm:h-28 sm:w-20 md:h-40 md:w-28 lg:h-52 lg:w-40 object-contain rounded-lg sm:rounded-xl" />
                   </div>
                 ))}
               </div>
@@ -346,8 +372,8 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
           );
         })()}
 
-        {/* Text Input for fill-in-the-blank */}
-        <div className="w-full max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl mb-2 sm:mb-3">
+        {/* Text Input for fill-in-the-blank - mobile optimized */}
+        <div className="w-full max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl mb-1 sm:mb-3">
             <input
               type="text"
               ref={inputRef}
@@ -356,7 +382,7 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
               placeholder="Type the full word here..."
               disabled={showResult}
               autoFocus
-              className={`w-full p-3 sm:p-3.5 md:p-4 text-sm sm:text-sm md:text-base lg:text-lg border-2 rounded-xl sm:rounded-2xl font-bold transition-all ${
+              className={`w-full p-3 sm:p-3.5 md:p-4 text-lg sm:text-sm md:text-base lg:text-lg border-2 rounded-xl sm:rounded-2xl font-bold transition-all ${
                 showResult
                   ? isCorrect
                     ? 'bg-green-100 border-green-500 text-green-800'
@@ -365,12 +391,17 @@ export default function FillupsPage({ onQuestionComplete, isReviewMode = false }
               }`}
             />
           </div>
+        
+        {/* Bottom padding - mobile only for fixed button */}
+        <div className="h-16 sm:h-0 md:h-0"></div>
+      </div>
 
-        {/* Bottom Continue Button */}
-        <div className="w-full max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl mt-auto mb-4 sm:mb-6 md:mb-8">
+      {/* Continue Button - fixed on mobile, normal on desktop */}
+      <div className="fixed sm:relative bottom-0 left-0 right-0 sm:bottom-auto sm:left-auto sm:right-auto bg-white border-t-2 border-blue-300 sm:border-t-0 shadow-lg sm:shadow-none px-2 sm:px-3 md:px-6 py-3 sm:py-4 z-50 sm:z-auto">
+        <div className="w-full max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl mx-auto">
           <button
             onClick={() => showResult ? handleNext() : handleSubmit()}
-            className="w-full py-3 sm:py-4 md:py-5 rounded-xl sm:rounded-2xl bg-blue-600 text-white font-extrabold text-base sm:text-lg md:text-xl btn-responsive"
+            className="w-full py-3 sm:py-4 md:py-5 rounded-lg sm:rounded-xl bg-blue-600 text-white font-extrabold text-xl sm:text-base md:text-lg hover:bg-blue-700 transition-colors shadow-lg sm:shadow-none"
           >
             {showResult ? 'Continue' : 'Check'}
           </button>

@@ -1,27 +1,51 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
-export default function IncorrectAnswerModal({ isOpen, onClose, onContinue, onTryAgain, incorrectText, correctAnswer }) {
+export default function IncorrectAnswerModal({ 
+  isOpen, 
+  onClose, 
+  onContinue, 
+  onTryAgain, 
+  incorrectText, 
+  correctAnswer,
+  showContinueButton = true,
+  showTryAgainButton = true
+}) {
   const [isVisible, setIsVisible] = useState(false);
+  const continueBtnRef = useRef(null);
+  const tryAgainBtnRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
       // Small delay to ensure smooth animation
       setTimeout(() => setIsVisible(true), 10);
+
+      // Focus primary action for reliable Enter handling (does not affect other components)
+      setTimeout(() => {
+        const target = (typeof onContinue === 'function') ? continueBtnRef.current : tryAgainBtnRef.current;
+        try { target && target.focus(); } catch (_) {}
+      }, 30);
+
       const onKey = (e) => {
         if (e.key !== 'Enter') return;
-        // Prefer Continue when provided, otherwise Try Again
-        if (typeof onContinue === 'function') {
+        if (e.repeat) return; // avoid multiple triggers when held
+        if (e.isComposing) return; // ignore IME composing
+        e.preventDefault();
+        e.stopPropagation();
+        // Prefer Continue if it's available AND shown
+        if (typeof onContinue === 'function' && showContinueButton) {
           onContinue();
-        } else if (typeof onTryAgain === 'function') {
+        } 
+        // Otherwise, use Try Again if it's available AND shown
+        else if (typeof onTryAgain === 'function' && showTryAgainButton) {
           onTryAgain();
         }
       };
-      window.addEventListener('keydown', onKey);
-      return () => window.removeEventListener('keydown', onKey);
+      window.addEventListener('keydown', onKey, { capture: true });
+      return () => window.removeEventListener('keydown', onKey, { capture: true });
     } else {
       setIsVisible(false);
     }
-  }, [isOpen, onContinue, onTryAgain]);
+  }, [isOpen, onContinue, onTryAgain, showContinueButton, showTryAgainButton]);
 
   if (!isOpen) return null;
 
@@ -66,16 +90,18 @@ export default function IncorrectAnswerModal({ isOpen, onClose, onContinue, onTr
               </div>
             </div>
             <div className="flex gap-2">
-              {typeof onTryAgain === 'function' && (
+              {typeof onTryAgain === 'function' && showTryAgainButton && (
                 <button
+                  ref={tryAgainBtnRef}
                   onClick={onTryAgain}
                   className="px-4 py-2 rounded-xl text-white font-extrabold text-sm bg-orange-600 hover:bg-orange-700 transition-colors"
                 >
                   Try Again
                 </button>
               )}
-              {typeof onContinue === 'function' && (
+              {typeof onContinue === 'function' && showContinueButton && (
                 <button
+                  ref={continueBtnRef}
                   onClick={onContinue}
                   className="px-4 py-2 rounded-xl text-white font-extrabold text-sm bg-green-600 hover:bg-green-700 transition-colors"
                 >
@@ -122,16 +148,18 @@ export default function IncorrectAnswerModal({ isOpen, onClose, onContinue, onTr
             </div>
           </div>
           <div className="flex gap-3">
-            {typeof onTryAgain === 'function' && (
+            {typeof onTryAgain === 'function' && showTryAgainButton && (
               <button
+                ref={tryAgainBtnRef}
                 onClick={onTryAgain}
                 className="px-6 py-3 rounded-2xl text-white font-extrabold text-lg bg-orange-600 hover:bg-orange-700 transition-colors"
               >
                 Try Again
               </button>
             )}
-            {typeof onContinue === 'function' && (
+            {typeof onContinue === 'function' && showContinueButton && (
               <button
+                ref={continueBtnRef}
                 onClick={onContinue}
                 className="px-8 py-3 rounded-2xl text-white font-extrabold text-xl bg-green-600 hover:bg-green-700 transition-colors"
               >

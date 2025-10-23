@@ -3,9 +3,22 @@ import axios from 'axios';
 // The base URL of your backend API
 // In development, use same-origin so Vite proxy (see vite.config.js) forwards to http://localhost:5000
 // In production, allow overriding with VITE_API_BASE, otherwise fall back to current origin
-const BASE = import.meta.env.DEV
-  ? ''
-  : (import.meta.env.VITE_API_BASE || 'http://hoshi-backend-env.eba-t92ieqn2.ap-southeast-2.elasticbeanstalk.com');
+// For mobile access on local network, use the local IP
+const getBaseURL = () => {
+  if (import.meta.env.DEV) {
+    return ''; // Use Vite proxy in development
+  }
+  
+  // Check if we're accessing from mobile on local network
+  const hostname = window.location.hostname;
+  if (hostname === '192.168.1.11') {
+    return 'http://192.168.1.11:5000'; // Local network backend
+  }
+  
+  return import.meta.env.VITE_API_BASE || '';
+};
+
+const BASE = getBaseURL();
 const API_URL = `${BASE}/api/auth/`;
 
 // Debug logging

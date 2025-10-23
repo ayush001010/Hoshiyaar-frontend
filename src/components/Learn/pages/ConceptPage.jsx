@@ -67,55 +67,59 @@ export default function ConceptPage() {
   if (item.type !== 'concept' && item.type !== 'statement') return <div className="p-6">No concept at this step.</div>;
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 sm:p-4">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
+      {/* Header - reduced padding for mobile */}
+      <div className="flex items-center justify-between p-2 sm:p-3 md:p-4 flex-shrink-0">
         <button 
           onClick={() => setShowExitConfirm(true)}
           className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-sm sm:text-base"
         >
           ✕
         </button>
-        <div className="flex-1 mx-2 sm:mx-4">
+        <div className="flex-1 mx-1 sm:mx-2 md:mx-4">
           <ProgressBar currentIndex={index} total={items.length} />
         </div>
         <StarCounter />
       </div>
 
-      {/* Main Content - responsive text and spacing */}
-      <div className="flex-1 flex flex-col items-center px-3 sm:px-4 md:px-6">
-
-        {/* Title and Text */}
+      {/* Main Content - mobile optimized, desktop unchanged */}
+      <div className="flex-1 flex flex-col items-center px-2 sm:px-4 md:px-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+        {/* Title and Text - mobile optimized, desktop unchanged */}
         {item.title && (
-          <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-extrabold text-gray-900 text-center mt-4 sm:mt-6 md:mt-8 text-overflow-fix px-2">
+          <h2 className="text-2xl sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-gray-900 text-center mt-2 sm:mt-6 md:mt-8 text-overflow-fix px-1 sm:px-2">
             {item.title}
           </h2>
         )}
-        <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mt-4 sm:mt-6 md:mt-8 lg:mt-10">
+        <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mt-2 sm:mt-6 md:mt-8 lg:mt-10">
           <p
-            className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl 2xl:text-4xl font-extrabold text-gray-900 leading-relaxed whitespace-pre-wrap text-center text-overflow-fix px-2"
+            className="text-lg sm:text-base md:text-lg lg:text-xl xl:text-2xl font-extrabold text-gray-900 leading-relaxed whitespace-pre-wrap text-center text-overflow-fix px-1 sm:px-2"
             dangerouslySetInnerHTML={{ __html: String(item.text || item.content || '') }}
           />
         </div>
 
-        {/* Images block (between text and button) */}
+        {/* Images block - mobile optimized, desktop unchanged */}
         {(() => { const imgs = (item.images || []).filter(Boolean); if (imgs.length === 0 && item.imageUrl) imgs.push(item.imageUrl); return imgs.length > 0 ? (
-          <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mt-4 sm:mt-6 md:mt-8 flex justify-center">
-            <div className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-5">
+          <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mt-2 sm:mt-6 md:mt-8 flex justify-center">
+            <div className="flex flex-wrap justify-center gap-1 sm:gap-3 md:gap-5">
               {((item.images && item.images.filter(Boolean)) || (item.imageUrl ? [item.imageUrl] : [])).slice(0,5).map((src, i) => (
-                <div key={i} className="border border-blue-300 rounded-xl sm:rounded-2xl p-2 sm:p-3 bg-white shadow-sm">
-                  <img src={src} alt={'concept-'+i} className="h-32 w-24 sm:h-48 sm:w-36 md:h-60 md:w-44 lg:h-80 lg:w-60 xl:h-[22rem] xl:w-[16rem] object-contain rounded-lg sm:rounded-xl" />
+                <div key={i} className="border border-blue-300 rounded-lg sm:rounded-2xl p-1 sm:p-3 bg-white shadow-sm">
+                  <img src={src} alt={'concept-'+i} className="h-40 w-32 sm:h-32 sm:w-24 md:h-48 md:w-36 lg:h-60 lg:w-44 xl:h-80 xl:w-60 object-contain rounded-md sm:rounded-xl" />
                 </div>
               ))}
             </div>
           </div>
         ) : null })()}
+        
+        {/* Bottom padding - mobile only for fixed button */}
+        <div className="h-16 sm:h-0 md:h-0"></div>
+      </div>
 
-        {/* Bottom Continue button */}
-        <div className="w-full max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl mt-auto mb-4 sm:mb-6 md:mb-8">
+      {/* Continue button - fixed on mobile, normal on desktop */}
+      <div className="fixed sm:relative bottom-0 left-0 right-0 sm:bottom-auto sm:left-auto sm:right-auto bg-white border-t-2 border-blue-300 sm:border-t-0 shadow-lg sm:shadow-none px-2 sm:px-3 md:px-6 py-3 sm:py-4 z-50 sm:z-auto">
+        <div className="w-full max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl mx-auto">
           <button 
             onClick={goNext}
-            className="w-full py-3 sm:py-4 md:py-5 rounded-xl sm:rounded-2xl bg-blue-600 text-white font-extrabold text-base sm:text-lg md:text-xl hover:bg-blue-700 transition-colors btn-responsive"
+            className="w-full py-3 sm:py-4 md:py-5 rounded-lg sm:rounded-xl bg-blue-600 text-white font-extrabold text-xl sm:text-base md:text-lg hover:bg-blue-700 transition-colors shadow-lg sm:shadow-none"
           >
             Continue
           </button>

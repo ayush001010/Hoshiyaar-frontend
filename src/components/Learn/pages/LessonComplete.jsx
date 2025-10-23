@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useReview } from '../../../context/ReviewContext.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import { useStars } from '../../../context/StarsContext.jsx';
 import image07 from '../../../assets/images/image-07.png';
 import reattemptImg from '../../../assets/images/reattempt.png';
 import finishImg from '../../../assets/images/finish.png';
@@ -13,6 +14,7 @@ const LessonComplete = () => {
   const [isChecking, setIsChecking] = useState(true);
   const { hasItems } = useReview();
   const { user } = useAuth();
+  const { stars } = useStars();
   const [scores, setScores] = useState({ best: 0, last: 0 });
   const isNewBest = Math.max(0, Number(scores.last || 0)) >= Math.max(0, Number(scores.best || 0)) && (scores.last || 0) > 0;
   const [showConfetti, setShowConfetti] = useState(false);
@@ -102,7 +104,7 @@ const LessonComplete = () => {
   }
 
   return (
-    <div className="h-screen bg-white flex flex-col items-center justify-between px-6 sm:px-10 md:px-12 py-4 text-center overflow-hidden">
+    <div className="h-screen bg-white relative flex flex-col items-center justify-between px-6 sm:px-10 md:px-12 py-4 text-center overflow-hidden">
       
       {hasItems ? (
         <>
@@ -132,26 +134,22 @@ const LessonComplete = () => {
               <div className="absolute text-3xl animate-bounce" style={{ top: 46, right: 24, animationDelay: '0.45s' }}>⭐</div>
             </div>
           )}
-          <p className="mt-1 text-2xl md:text-3xl text-gray-900 font-extrabold max-w-4xl px-2">You rocked this lesson. Ready for the next adventure?</p>
-          {/* Kid-friendly score card */}
-          <div className="mt-3 w-full max-w-xl">
-            <div className="relative w-full rounded-3xl border-4 border-yellow-300 shadow-[0_10px_0_0_rgba(0,0,0,0.1)] overflow-hidden"
-                 style={{ background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)' }}>
-              <div className="flex items-center gap-4 p-4 md:p-5">
-                <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl flex items-center justify-center bg-yellow-200 border-4 border-yellow-300 shadow-inner">
-                  <svg viewBox="0 0 24 24" className="w-10 h-10 text-yellow-500">
-                    <path fill="currentColor" d="M12 2.75l2.95 5.98 6.6.96-4.78 4.66 1.13 6.58L12 18.77l-5.9 3.16 1.13-6.58L2.45 9.69l6.6-.96L12 2.75z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <div className="text-xl md:text-2xl font-extrabold text-yellow-700">You earned {Math.max(0, Number(scores.last||0))} stars!</div>
-                  <div className="text-sm md:text-base font-bold text-yellow-800/90 mt-0.5">Best for this lesson: {Math.max(0, Number(scores.best||0))}</div>
-                </div>
-                {isNewBest && (
-                  <div className="absolute -top-3 -right-3 rotate-6">
-                    <span className="px-2.5 py-1 rounded-xl bg-pink-500 text-white text-xs md:text-sm font-extrabold shadow-md">NEW HIGH SCORE ✨</span>
+          <p className="mt-4 text-2xl md:text-3xl text-gray-900 font-extrabold max-w-4xl px-2">You rocked this lesson. Ready for the next adventure?</p>
+          {/* Total Stars card moved here (replaces bottom yellow box) */}
+          <div className="mt-6 w-full max-w-xl">
+            <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-4 border-yellow-400 rounded-2xl px-4 py-6 shadow-[0_8px_0_0_rgba(0,0,0,0.10)]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">⭐</span>
+                  <div>
+                    <div className="text-xs font-extrabold text-yellow-700">Total Stars</div>
+                    <div className="text-lg font-extrabold text-yellow-600">{stars} stars</div>
                   </div>
-                )}
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm">✨</span>
+                  <span className="text-xs font-bold text-yellow-600">Earned!</span>
+                </div>
               </div>
             </div>
           </div>

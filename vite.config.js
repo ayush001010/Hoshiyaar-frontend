@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'http://localhost:5000', // Your local backend for development
         changeOrigin: true,
         secure: false,
       },
@@ -23,7 +23,9 @@ export default defineConfig({
       },
     },
   },
-  base: './', // This fixes the path issue for S3
+  // --- THIS LINE IS THE FIX ---
+  base: '/', // Use root-relative paths for CloudFront/SPA routing
+  // ---------------------------
   // Add SPA fallback for development
   preview: {
     port: 4173,

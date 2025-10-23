@@ -6,7 +6,7 @@ import IncorrectAnswerModal from '../../modals/IncorrectAnswerModal.jsx';
 import authService from '../../../services/authService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useReview } from '../../../context/ReviewContext.jsx';
-import { useStars } from '../../../context/StarsContext.jsx';
+import { useStars, StarCounter } from '../../../context/StarsContext.jsx';
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useModuleItems } from '../../../hooks/useModuleItems';
@@ -51,7 +51,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
   const actualReviewMode = isReviewMode || isReviewModeFromUrl;
   const { user } = useAuth();
   const { add: addToReview, removeActive, requeueActive } = useReview();
-  const { addStars } = useStars();
+  const { addStars, awardCorrect } = useStars();
   const [arrangedWords, setArrangedWords] = useState([]);
   const [availableWords, setAvailableWords] = useState([]);
   const [showResult, setShowResult] = useState(false);
@@ -65,6 +65,8 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
   const [isFlagged] = useState(false);
   const [showTryAgainOption, setShowTryAgainOption] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  // First-attempt guard per question instance
+  const [hasAttempted, setHasAttempted] = useState(false);
   
   // Audio refs
   const correctAudioRef = useRef(null);
@@ -122,6 +124,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
     setShowIncorrectModal(false);
     setHasAnsweredCorrectly(false);
     setShowTryAgainOption(false);
+    setHasAttempted(false);
 
     if (!item) return;
     // Prefer explicit words from item
@@ -142,20 +145,6 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
 
   // Allow browser back
   useEffect(() => {}, []);
-
-  // Reset server-side lesson score at entry so lastScore starts at 0 per run
-  useEffect(() => {
-    (async () => {
-      try {
-        if (user?._id) {
-          const params = new URLSearchParams(window.location.search);
-          const title = params.get('title') || item?.title || `Module ${moduleNumber}`;
-          await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: title, isCorrect: true, deltaScore: 0, resetLesson: true });
-        }
-      } catch (_) {}
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moduleNumber]);
 
   // Enter to submit/continue
   useEffect(() => {
@@ -280,14 +269,20 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
     
     setIsCorrect(correct);
     setShowResult(true);
+    const isFirstAttempt = !hasAttempted;
+    if (!hasAttempted) setHasAttempted(true);
 
     // Play appropriate audio feedback
     if (correct) {
       playCorrectSound();
       setHasAnsweredCorrectly(true);
       setShowTryAgainOption(false); // Hide try again when correct
-      const pts = actualReviewMode ? 10 : 5;
-      try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: true, deltaScore: pts }); } catch (_) {}
+      if (isFirstAttempt) {
+        const qid = `${moduleNumber}_${index}_rearrange`;
+        const pts = 5; // both standard and revision award +5 on first correct
+        if (pts !== 0) awardCorrect(String(moduleNumber), qid, pts);
+        try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: true, deltaScore: pts }); } catch (_) {}
+      }
       
       if (actualReviewMode) {
         removeActive();
@@ -298,7 +293,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       // Immediate feedback and enqueue for review
       setShowTryAgainOption(false);
       setShowIncorrectModal(true);
-      try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: false, deltaScore: 0 }); } catch (_) {}
+      if (isFirstAttempt && !actualReviewMode) addStars(-2);
       const questionId = `${moduleNumber}_${index}_rearrange`;
       if (!actualReviewMode) {
         addToReview({ questionId, moduleNumber, index, type: 'rearrange' });
@@ -356,8 +351,29 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
         const zeroIdx = Number(moduleNumber) - 1;
         markCompletedLocal(zeroIdx);
         recordCompletedId(moduleNumber);
+        // Also store in user-scoped keys for dashboard compatibility
+        try {
+          const userScopedKey = (base) => `${base}__${user?._id || 'anon'}`;
+          const userLS_KEY = userScopedKey('lesson_progress_v1');
+          const userIDS_KEY = userScopedKey('lesson_completed_ids_v1');
+          
+          // Update user-scoped progress
+          const userRaw = localStorage.getItem(userLS_KEY);
+          const userStore = userRaw ? JSON.parse(userRaw) : {};
+          const userSet = new Set(userStore['default'] || []);
+          userSet.add(zeroIdx);
+          userStore['default'] = Array.from(userSet);
+          localStorage.setItem(userLS_KEY, JSON.stringify(userStore));
+          
+          // Update user-scoped completed IDs
+          const userIdsRaw = localStorage.getItem(userIDS_KEY);
+          const userIdsArr = userIdsRaw ? JSON.parse(userIdsRaw) : [];
+          const userIdsSet = new Set(userIdsArr);
+          userIdsSet.add(String(moduleNumber));
+          localStorage.setItem(userIDS_KEY, JSON.stringify(Array.from(userIdsSet)));
+        } catch (_) {}
       } catch (_) {}
-      return navigate(`/lesson-complete?chapter=${encodeURIComponent(moduleNumber)}`);
+      return navigate('/lesson-complete');
     }
     navigate(`${routeForType(nextItem.type, nextIndex)}${suffix}`);
   }
@@ -396,21 +412,21 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
   if (item.type !== 'rearrange') return <div className="p-6">No rearrange at this step.</div>;
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
+      {/* Header - reduced padding for mobile */}
+      <div className="flex items-center justify-between p-2 sm:p-3 md:p-4 flex-shrink-0">
         {!actualReviewMode && (
           <button 
             onClick={() => setShowExitConfirm(true)}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+            className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
           >
             ✕
           </button>
         )}
-        <div className="flex-1 mx-4">
+        <div className="flex-1 mx-1 sm:mx-2 md:mx-4">
       <ProgressBar currentIndex={index} total={items.length} />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
           
           {/* Show flagged status */}
           {isFlagged && (
@@ -420,13 +436,13 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
             </div>
           )}
           
-          {/* Score counter removed per new rules */}
+          <StarCounter />
         </div>
       </div>
 
-      {/* Main Content - left image, right question + arranged area, word bank below */}
-      <div className="flex-1 w-full px-6 max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start mt-6">
+      {/* Main Content - optimized for mobile with reduced spacing */}
+      <div className="flex-1 w-full px-2 sm:px-4 md:px-6 max-w-6xl mx-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 items-start mt-2 sm:mt-4 md:mt-6">
           {/* Image (Left) - render uploaded images if available */}
           {(() => {
             const imgs = (item.images || []).filter(Boolean);
@@ -434,16 +450,16 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
             const list = imgs.length > 0 ? imgs : primary;
             if (list.length === 0) {
               return (
-                <div className="w-full h-64 rounded-3xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center">
-                  <span className="text-gray-400">Image</span>
+                <div className="w-full h-48 sm:h-56 md:h-64 rounded-xl sm:rounded-2xl border-2 border-gray-200 bg-gray-50 flex items-center justify-center">
+                  <span className="text-gray-400 text-sm sm:text-base">Image</span>
                 </div>
               );
             }
             return (
-              <div className="w-full rounded-3xl border-2 border-gray-200 bg-white flex items-center justify-center p-3">
-                <div className="flex flex-wrap justify-center gap-3">
+              <div className="w-full rounded-xl sm:rounded-2xl border-2 border-gray-200 bg-white flex items-center justify-center p-2 sm:p-3">
+                <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
                   {list.slice(0, 5).map((src, i) => (
-                    <img key={i} src={src} alt={`rearrange-${i}`} className="h-44 w-36 md:h-52 md:w-40 object-contain rounded-xl border" />
+                    <img key={i} src={src} alt={`rearrange-${i}`} className="h-40 w-32 sm:h-48 sm:w-40 md:h-56 md:w-44 object-contain rounded-lg sm:rounded-xl border" />
                   ))}
                 </div>
               </div>
@@ -452,16 +468,16 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
 
           {/* Question + Arranged (Right) */}
           <div className="flex flex-col">
-            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-4 md:mb-6">{item.question}</h2>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 mb-2 sm:mb-4 md:mb-6">{item.question}</h2>
             {/* Removed dotted placeholder lines to declutter UI */}
             {/* Arranged Words Area with in-box reset */}
             <div className="relative">
               <div
-                className={`min-h-[120px] border-2 border-dashed border-gray-300 rounded-2xl p-4 bg-gray-50 ${isResetting ? 'transition-opacity opacity-50' : ''}`}
+                className={`min-h-[100px] sm:min-h-[120px] border-2 border-dashed border-gray-300 rounded-xl sm:rounded-2xl p-2 sm:p-4 bg-gray-50 ${isResetting ? 'transition-opacity opacity-50' : ''}`}
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, 'arranged')}
               >
-                <div className="flex flex-wrap gap-2 min-h-[80px]">
+                <div className="flex flex-wrap gap-1 sm:gap-2 min-h-[60px] sm:min-h-[80px]">
                 {arrangedWords.map((word, idx) => (
                   <button
                     key={`arranged-${word}-${idx}`}
@@ -469,7 +485,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
                     draggable
                     onDragStart={(e) => handleDragStart(e, word, 'arranged', idx)}
                     data-index={idx}
-                    className={`px-4 py-2 rounded-xl border-2 font-semibold transition-all ${
+                    className={`px-3 py-2 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl border-2 font-semibold transition-all text-sm sm:text-base ${
                       showResult
                         ? isCorrect
                           ? 'bg-green-500 border-green-500 text-white'
@@ -496,7 +512,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
             </div>
 
             {/* Word bank and Check button on the right column */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3 mt-4 sm:mt-6 md:mt-8">
               {availableWords.length > 0 ? (
                 availableWords.map((word, idx) => (
                   <button
@@ -505,7 +521,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
                     draggable
                     onDragStart={(e) => handleDragStart(e, word, 'available', idx)}
                     disabled={showResult}
-                    className={`p-3 rounded-xl border-2 font-semibold transition-all ${
+                    className={`p-2 sm:p-3 rounded-lg sm:rounded-xl border-2 font-semibold transition-all text-sm sm:text-base ${
                       showResult
                         ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed'
                         : 'bg-white border-gray-300 text-gray-700 hover:border-blue-400 hover:scale-105 cursor-move'
@@ -519,11 +535,11 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
               )}
             </div>
 
-            <div className="w-full max-w-md mt-6 self-start">
+            <div className="w-full max-w-md mt-4 sm:mt-6 self-start">
               {!showResult && (
                 <button
                   onClick={handleSubmit}
-                  className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-lg"
+                  className="w-full py-3 sm:py-4 rounded-xl sm:rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-lg sm:text-xl"
                 >
                   Check
                 </button>
@@ -534,7 +550,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
       </div>
 
       {/* Inline Duolingo-style feedback bar - show for both correct and incorrect answers */}
-      {showResult && !actualReviewMode && isCorrect && (
+      {showResult && !actualReviewMode && (
         <div className={`fixed left-0 right-0 bottom-0 z-50 border-t-4 shadow-2xl ${
           isCorrect ? 'bg-green-50 border-green-400' : 'bg-red-50 border-red-400'
         }`}>
@@ -546,7 +562,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
             </div>
             <div className="flex gap-3">
               {/* Show Try Again button ONLY for incorrect answers */}
-              {!isCorrect && (
+              {!isCorrect && showTryAgainOption && (
                 <button
                   onClick={() => {
                     console.log('[Rearrange DEBUG] Try Again button clicked');
@@ -558,7 +574,7 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
                 </button>
               )}
               {/* Show Continue button ONLY for correct answers */}
-              {isCorrect && !showIncorrectModal && (
+              {isCorrect && (
                 <button
                   onClick={handleNext}
                   className="px-8 py-3 rounded-2xl text-white font-extrabold text-xl bg-green-600 hover:bg-green-700 transition-colors"
@@ -588,6 +604,8 @@ export default function RearrangePage({ onQuestionComplete, isReviewMode = false
         onClose={() => {}}
         onTryAgain={handleModalTryAgain}
         onContinue={() => handleNext(true)}
+        showContinueButton={false}
+        showTryAgainButton={true}
         incorrectText={arrangedWords.join(' ')}
         correctAnswer={Array.isArray(item?.answer) ? item?.answer[0] : item?.answer}
       />

@@ -18,7 +18,7 @@ const Header = () => {
         <Link to="/" className="flex items-center gap-2 sm:gap-4">
           <span className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold text-duo-blue tracking-tight">HoshiYaar</span>
         </Link>
-        <div>
+        <div className="flex items-center gap-4">
           {user ? (
             // If user is logged in, show Account and Logout buttons
             <div className="flex items-center gap-2 sm:gap-3 md:gap-4">

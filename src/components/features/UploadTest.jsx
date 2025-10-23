@@ -3,7 +3,7 @@ import heroPoint from '../../assets/images/imageUpload.png';
 
 // API base URL configuration - same logic as other services
 const isLocalhost = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)/.test(window.location.hostname);
-const API_BASE = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || 'http://hoshi-backend-env.eba-t92ieqn2.ap-southeast-2.elasticbeanstalk.com');
+const API_BASE = isLocalhost ? '' : (import.meta.env.VITE_API_BASE || '');
 
 export default function UploadTest() {
   const [file, setFile] = useState(null);

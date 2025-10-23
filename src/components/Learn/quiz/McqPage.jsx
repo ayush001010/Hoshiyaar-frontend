@@ -11,7 +11,7 @@ import { useModuleItems } from '../../../hooks/useModuleItems';
 import authService from '../../../services/authService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useReview } from '../../../context/ReviewContext.jsx';
-import { useStars } from '../../../context/StarsContext.jsx';
+import { useStars, StarCounter } from '../../../context/StarsContext.jsx';
 // Inline feedback bar instead of modal
 
 export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
@@ -61,6 +61,8 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
   const [isFlagged] = useState(false);
   const [showTryAgainOption, setShowTryAgainOption] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  // Track first attempt per question instance; re-attempts score 0
+  const [hasAttempted, setHasAttempted] = useState(false);
 
   // Sound effects
   const correctAudio = useRef(null);
@@ -94,6 +96,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
     setShowIncorrectModal(false);
     setHasAnsweredCorrectly(false);
     setShowTryAgainOption(false);
+    setHasAttempted(false);
   }, [item, moduleNumber, index]);
 
   // Allow native browser back (no intercept)
@@ -113,17 +116,34 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleNumber]);
 
-  // Disable Enter key triggering selection on MCQ pages
+  // Enter handling on MCQ pages
+  // 1) Before an answer is shown (showResult === false), block Enter so it doesn't select anything accidentally
+  // 2) After result is shown:
+  //    - For incorrect: allow propagation so the incorrect modal can handle Enter (Try Again)
+  //    - For correct: map Enter to Continue
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Enter') {
+      if (e.key !== 'Enter') return;
+      if (!showResult) {
         e.preventDefault();
         e.stopPropagation();
       }
     };
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true });
-  }, []);
+  }, [showResult]);
+
+  // When the answer is correct and result is visible, pressing Enter should continue
+  useEffect(() => {
+    if (!(showResult && isCorrect)) return;
+    const onKey = (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      handleNext();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showResult, isCorrect]);
 
   function routeForType(type, idx) {
     switch (type) {
@@ -145,6 +165,8 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
     const correct = String(selectedOption).trim().toLowerCase() === item.answer.trim().toLowerCase();
     setIsCorrect(correct);
     setShowResult(true);
+    const isFirstAttempt = !hasAttempted;
+    if (!hasAttempted) setHasAttempted(true);
 
     // Play feedback sound (user gesture triggered)
     try {
@@ -159,11 +181,13 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
     if (correct) {
       setHasAnsweredCorrectly(true);
       setShowTryAgainOption(false); // Hide try again when correct
-      // Idempotent per-question scoring
-      const qid = `${moduleNumber}_${index}_mcq`;
-      const pts = actualReviewMode ? 10 : 5;
-      awardCorrect(String(moduleNumber), qid, pts);
-      try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: true, deltaScore: pts }); } catch (_) {}
+      // Award only on first attempt
+      if (isFirstAttempt) {
+        const qid = `${moduleNumber}_${index}_mcq`;
+        const pts = 5; // both standard and revision award +5 on first correct
+        if (pts !== 0) awardCorrect(String(moduleNumber), qid, pts);
+        try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: true, deltaScore: pts }); } catch (_) {}
+      }
       
       // If in review mode, notify and go back to module
       if (actualReviewMode) {
@@ -174,11 +198,11 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
       // Immediate feedback and enqueue for review
       setShowTryAgainOption(false);
       setShowIncorrectModal(true);
-      // scoring penalty
-      if (!actualReviewMode) {
+      // scoring penalty (first attempt only; none in review/revision)
+      if (isFirstAttempt && !actualReviewMode) {
         const qid = `${moduleNumber}_${index}_mcq`;
         awardWrong(String(moduleNumber), qid, -2, { isRetry: false });
-        try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: false, deltaScore: 0 }); } catch (_) {}
+        try { if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), lessonTitle: item?.title || `Module ${moduleNumber}`, isCorrect: false, deltaScore: -2 }); } catch (_) {}
       }
       const questionId = `${moduleNumber}_${index}_multiple-choice`;
       if (!actualReviewMode) {
@@ -232,16 +256,49 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
     const suffix = title ? `?title=${encodeURIComponent(title)}` : '';
     
     if (nextIndex >= items.length) {
-      // Finished module: now count progress
+      // Finished module: now count progress - Database is primary source
       try {
-        if (user?._id) await authService.updateProgress({ userId: user._id, chapter: Number(moduleNumber), conceptCompleted: true });
-      } catch (_) {}
+        if (user?._id) {
+          console.log('[MCQ] Saving module completion to database:', moduleNumber);
+          const response = await authService.updateProgress({ 
+            userId: user._id, 
+            chapter: Number(moduleNumber), 
+            conceptCompleted: true 
+          });
+          console.log('[MCQ] Database save response:', response?.data);
+        }
+      } catch (error) {
+        console.error('[MCQ] Failed to save to database:', error);
+        // Still continue with local storage as fallback
+      }
+      
       // Also persist locally so dashboard immediately reflects completion
       try {
         const zeroIdx = Number(moduleNumber) - 1;
         markCompletedLocal(zeroIdx);
         // Store by module id
         recordCompletedId(moduleNumber);
+        // Also store in user-scoped keys for dashboard compatibility
+        try {
+          const userScopedKey = (base) => `${base}__${user?._id || 'anon'}`;
+          const userLS_KEY = userScopedKey('lesson_progress_v1');
+          const userIDS_KEY = userScopedKey('lesson_completed_ids_v1');
+          
+          // Update user-scoped progress
+          const userRaw = localStorage.getItem(userLS_KEY);
+          const userStore = userRaw ? JSON.parse(userRaw) : {};
+          const userSet = new Set(userStore['default'] || []);
+          userSet.add(zeroIdx);
+          userStore['default'] = Array.from(userSet);
+          localStorage.setItem(userLS_KEY, JSON.stringify(userStore));
+          
+          // Update user-scoped completed IDs
+          const userIdsRaw = localStorage.getItem(userIDS_KEY);
+          const userIdsArr = userIdsRaw ? JSON.parse(userIdsRaw) : [];
+          const userIdsSet = new Set(userIdsArr);
+          userIdsSet.add(String(moduleNumber));
+          localStorage.setItem(userIDS_KEY, JSON.stringify(Array.from(userIdsSet)));
+        } catch (_) {}
       } catch (_) {}
       return navigate(`/lesson-complete?chapter=${encodeURIComponent(moduleNumber)}`);
     }
@@ -279,9 +336,9 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
   if (item.type !== 'multiple-choice') return <div className="p-6">No MCQ at this step.</div>;
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 sm:p-4">
+    <div className="h-screen bg-white flex flex-col overflow-hidden">
+      {/* Header - reduced padding for mobile */}
+      <div className="flex items-center justify-between p-2 sm:p-3 md:p-4 flex-shrink-0">
         {!actualReviewMode && (
           <button 
             onClick={() => setShowExitConfirm(true)}
@@ -290,10 +347,10 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
             ✕
           </button>
         )}
-        <div className="flex-1 mx-2 sm:mx-4">
+        <div className="flex-1 mx-1 sm:mx-2 md:mx-4">
       <ProgressBar currentIndex={index} total={items.length} />
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
           
           {/* Show flagged status */}
           {isFlagged && (
@@ -303,14 +360,13 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
             </div>
           )}
           
-          {/* Score counter removed per new rules */}
+          <StarCounter />
         </div>
       </div>
 
-      {/* Main Content - responsive text and spacing */}
-      <div className="flex-1 flex flex-col items-center px-3 sm:px-4 md:px-6">
-
-        <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-extrabold text-gray-900 text-center mt-4 sm:mt-6 md:mt-8 mb-2 sm:mb-3 md:mb-4 text-overflow-fix px-2">
+      {/* Main Content - mobile optimized, desktop unchanged */}
+      <div className="flex-1 flex flex-col items-center px-2 sm:px-4 md:px-6 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 80px)' }}>
+        <h2 className="text-xl sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-extrabold text-gray-900 text-center mt-2 sm:mt-6 md:mt-8 mb-2 sm:mb-3 md:mb-4 text-overflow-fix px-1 sm:px-2">
           {item.question}
         </h2>
 
@@ -322,11 +378,11 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
           const imgs = (item.images || []).filter(Boolean); 
           if (imgs.length === 0 && item.imageUrl) imgs.push(item.imageUrl); 
           return imgs.length > 0 ? (
-            <div className="w-full max-w-xl sm:max-w-2xl md:max-w-3xl mb-2 sm:mb-3 flex justify-center">
-              <div className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-5">
+            <div className="w-full max-w-xl sm:max-w-2xl md:max-w-3xl mb-1 sm:mb-3 flex justify-center">
+              <div className="flex flex-wrap justify-center gap-1 sm:gap-3 md:gap-5">
                 {((item.images && item.images.filter(Boolean)) || (item.imageUrl ? [item.imageUrl] : [])).slice(0,5).map((src, i) => (
-                  <div key={i} className="border border-blue-300 rounded-xl sm:rounded-2xl p-2 sm:p-3 bg-white shadow-sm">
-                    <img src={src} alt={'mcq-'+i} className="h-32 w-28 sm:h-44 sm:w-36 md:h-56 md:w-44 lg:h-72 lg:w-56 xl:h-80 xl:w-64 object-contain rounded-lg sm:rounded-xl" />
+                  <div key={i} className="border border-blue-300 rounded-lg sm:rounded-2xl p-1 sm:p-3 bg-white shadow-sm">
+                    <img src={src} alt={'mcq-'+i} className="h-40 w-36 sm:h-32 sm:w-24 md:h-48 md:w-36 lg:h-60 lg:w-44 xl:h-80 xl:w-60 object-contain rounded-md sm:rounded-xl" />
                   </div>
                 ))}
               </div>
@@ -335,15 +391,15 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
         })()}
 
         {!showResult && (
-          <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mb-3 sm:mb-4">
+          <div className="w-full max-w-2xl sm:max-w-3xl md:max-w-4xl mb-2 sm:mb-4">
             {(() => {
               // Check if any options are image URLs
               const hasImageOptions = item.options?.some(opt => typeof opt === 'string' && (opt.startsWith('http') || opt.startsWith('https')));
               
-              // Use horizontal layout for image options, vertical for text options
+              // Use horizontal layout for image options, horizontal for text options
               const containerClass = hasImageOptions 
-                ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6" 
-                : "grid grid-cols-1 gap-3 sm:gap-4 max-w-2xl sm:max-w-3xl mx-auto";
+                ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 md:gap-6" 
+                : "flex flex-col sm:flex-row gap-2 sm:gap-4 w-full";
               
               return (
                 <div className={containerClass}>
@@ -354,7 +410,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
                     
                     let buttonClass = hasImageOptions 
                       ? "p-2 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl border-2 text-center transition-all duration-200 hover:scale-[1.02] " 
-                      : "p-3 sm:p-4 rounded-xl sm:rounded-2xl border-2 text-center transition-all duration-200 hover:scale-[1.01] w-full ";
+                      : "p-2 sm:p-3 md:p-4 rounded-xl sm:rounded-2xl border-2 text-center transition-all duration-200 hover:scale-[1.01] flex-1 ";
               
               if (showResult) {
                 if (isSelected) {
@@ -382,21 +438,21 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
                       <img 
                         src={opt} 
                         alt={`Option ${idx + 1}`}
-                        className="w-full h-20 sm:h-28 md:h-32 lg:h-40 object-contain rounded-lg mb-1 sm:mb-2"
+                        className="w-full h-20 sm:h-20 md:h-24 lg:h-28 object-contain rounded-lg mb-1 sm:mb-2"
                         onError={(e) => {
                           e.target.style.display = 'none';
                           e.target.nextSibling.style.display = 'block';
                         }}
                       />
-                      <div className="text-xs sm:text-sm text-gray-600 font-medium" style={{display: 'none'}}>
+                      <div className="text-xs sm:text-xs text-gray-600 font-medium" style={{display: 'none'}}>
                         Option {idx + 1}
                       </div>
-                      <div className="text-xs sm:text-sm md:text-base font-semibold text-gray-700">
+                      <div className="text-xs sm:text-xs md:text-sm font-semibold text-gray-700">
                         Option {idx + 1}
                       </div>
                     </div>
                   ) : (
-                    <div className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-gray-700 text-overflow-fix">{opt}</div>
+                    <div className="text-xs sm:text-xs md:text-sm lg:text-base font-bold text-gray-700 text-overflow-fix">{opt}</div>
                   )}
                 </button>
                   );
@@ -414,10 +470,10 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
               // Check if any options are image URLs
               const hasImageOptions = item.options?.some(opt => typeof opt === 'string' && (opt.startsWith('http') || opt.startsWith('https')));
               
-              // Use horizontal layout for image options, vertical for text options
+              // Use horizontal layout for image options, horizontal for text options
               const containerClass = hasImageOptions 
                 ? "grid grid-cols-1 md:grid-cols-3 gap-6" 
-                : "grid grid-cols-1 gap-4 max-w-3xl mx-auto";
+                : "flex flex-col sm:flex-row gap-4 w-full";
               
               return (
                 <div className={containerClass}>
@@ -428,7 +484,7 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
                     
                     let buttonClass = hasImageOptions 
                       ? "p-4 rounded-2xl border-2 text-center transition-all duration-200 " 
-                      : "p-4 rounded-2xl border-2 text-center transition-all duration-200 w-full ";
+                      : "p-4 rounded-2xl border-2 text-center transition-all duration-200 flex-1 ";
               
               if (isSelected) {
                 buttonClass += isCorrect ? "bg-green-200 border-green-400" : "bg-red-200 border-red-400";
@@ -496,7 +552,9 @@ export default function McqPage({ onQuestionComplete, isReviewMode = false }) {
             })()}
           </div>
         )}
-        {/* No bottom continue button for MCQ; use the feedback bar's Continue */}
+        
+        {/* Bottom padding - mobile only for fixed button */}
+        <div className="h-4 sm:h-0 md:h-0"></div>
       </div>
 
       {/* Inline feedback bar - show only for correct answers; incorrect uses modal */}

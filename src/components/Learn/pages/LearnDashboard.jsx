@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { useNavigate } from "react-router-dom";
 import heroChar from "../../../assets/images/heroChar.png";
@@ -129,8 +129,9 @@ const PathNode = ({ status, onClick, disabled, offset = 0, color = "#2C6DEF", li
 
 const LearnDashboard = ({ onboardingData }) => {
   const { logout, user, loading: authLoading } = useAuth();
-  const { resetModuleLedger } = useStars();
+  const { resetModuleLedger, stars, syncFromServer, setTotal } = useStars();
   const navigate = useNavigate();
+  
   const [progress, setProgress] = useState([]);
   const [chapterTitle, setChapterTitle] = useState("");
   const [chapterId, setChapterId] = useState("");
@@ -158,6 +159,54 @@ const LearnDashboard = ({ onboardingData }) => {
   const [statsLoading, setStatsLoading] = useState(false);
   // Track when the first fetch completes to avoid false "No units" while fetching
   const [hasFetched, setHasFetched] = useState(false);
+
+  // Force refresh stars from localStorage on dashboard load
+  useEffect(() => {
+    const refreshStars = () => {
+      try {
+        const storedStars = localStorage.getItem('hs_stars_total_v1');
+        const starCount = Number(storedStars);
+        console.log('[LearnDashboard] Current localStorage value:', storedStars, '->', starCount);
+        if (Number.isFinite(starCount) && starCount >= 0) {
+          setTotal(starCount);
+          console.log('[LearnDashboard] Refreshed stars from localStorage:', starCount);
+        }
+      } catch (error) {
+        console.warn('[LearnDashboard] Failed to refresh stars:', error);
+      }
+    };
+    
+    // Immediate refresh
+    refreshStars();
+    
+    // Also refresh every 2 seconds to catch any updates
+    const refreshInterval = setInterval(() => {
+      console.log('[LearnDashboard] Periodic refresh...');
+      refreshStars();
+    }, 2000);
+    
+    // Also refresh when window gains focus (user returns from learning)
+    const handleFocus = () => {
+      console.log('[LearnDashboard] Window focused, refreshing stars...');
+      refreshStars();
+    };
+    window.addEventListener('focus', handleFocus);
+    
+    // Also refresh on visibility change (tab switching)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('[LearnDashboard] Tab became visible, refreshing stars...');
+        refreshStars();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(refreshInterval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [setTotal]);
 
   // Palette for per-unit theming
   const unitPalette = ["#2C6DEF", "#58CC02", "#CE82FF", "#00CD9C"];
@@ -229,8 +278,17 @@ const LearnDashboard = ({ onboardingData }) => {
   const loadLocalProgress = () => {
     if (!USE_LOCAL_PROGRESS) return {};
     try {
-      const raw = localStorage.getItem(LS_KEY);
-      return raw ? JSON.parse(raw) : {};
+      // Try user-scoped key first
+      let raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        return JSON.parse(raw);
+      }
+      // Fallback to non-scoped key for backward compatibility
+      raw = localStorage.getItem(LS_KEY_BASE);
+      if (raw) {
+        return JSON.parse(raw);
+      }
+      return {};
     } catch (_) {
       return {};
     }
@@ -272,9 +330,19 @@ const LearnDashboard = ({ onboardingData }) => {
   const loadCompletedIds = () => {
     if (!USE_LOCAL_PROGRESS) return new Set();
     try {
-      const raw = localStorage.getItem(LS_IDS_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      return new Set(arr);
+      // Try user-scoped key first
+      let raw = localStorage.getItem(LS_IDS_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        return new Set(arr);
+      }
+      // Fallback to non-scoped key for backward compatibility
+      raw = localStorage.getItem(LS_IDS_KEY_BASE);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        return new Set(arr);
+      }
+      return new Set();
     } catch (_) {
       return new Set();
     }
@@ -286,6 +354,116 @@ const LearnDashboard = ({ onboardingData }) => {
       if (moduleId) set.add(String(moduleId));
       localStorage.setItem(LS_IDS_KEY, JSON.stringify(Array.from(set)));
     } catch (_) {}
+  };
+
+  // Function to clear false completions and reset progress
+  const clearFalseCompletions = () => {
+    if (!USE_LOCAL_PROGRESS) return;
+    try {
+      console.log('[Progress Reset] Clearing false completions...');
+      
+      // Clear all local storage progress
+      localStorage.removeItem(LS_KEY);
+      localStorage.removeItem(LS_IDS_KEY);
+      localStorage.removeItem(LS_KEY_BASE);
+      localStorage.removeItem(LS_IDS_KEY_BASE);
+      
+      // Reset progress state to only database data
+      if (user?._id) {
+        // Keep only database progress, clear local additions
+        const serverCompletedSet = new Set(
+          (progress || [])
+            .filter((p) => p?.conceptCompleted)
+            .map((p) => (p?.chapter ? p.chapter - 1 : -1))
+            .filter((i) => i >= 0)
+        );
+        
+        // Only keep server-verified completions in local storage
+        const store = { default: Array.from(serverCompletedSet) };
+        saveLocalProgress(store);
+        
+        // Only keep server-verified completed IDs
+        const newCompletedIds = new Set();
+        modulesList.forEach((mod, index) => {
+          if (serverCompletedSet.has(index) && mod?._id) {
+            newCompletedIds.add(String(mod._id));
+          }
+        });
+        localStorage.setItem(LS_IDS_KEY, JSON.stringify(Array.from(newCompletedIds)));
+        
+        console.log('[Progress Reset] Reset to database-only progress:', {
+          serverCompleted: Array.from(serverCompletedSet),
+          completedIds: Array.from(newCompletedIds)
+        });
+      }
+      
+      // Force UI update
+      setProgressUpdateTrigger(prev => prev + 1);
+    } catch (error) {
+      console.error('[Progress Reset] Error:', error);
+    }
+  };
+
+  // Function to sync and fix progress discrepancies - Database is primary source
+  const syncProgress = async () => {
+    if (!USE_LOCAL_PROGRESS) return;
+    try {
+      // First, try to refresh progress from database
+      if (user?._id) {
+        try {
+          const response = await authService.getProgress(user._id);
+          if (response?.data) {
+            setProgress(response.data);
+            console.log('[Progress Sync] Refreshed from database:', response.data);
+          }
+        } catch (error) {
+          console.warn('[Progress Sync] Failed to refresh from database:', error);
+        }
+      }
+      
+      const serverCompletedSet = new Set(
+        (progress || [])
+          .filter((p) => p?.conceptCompleted)
+          .map((p) => (p?.chapter ? p.chapter - 1 : -1))
+          .filter((i) => i >= 0)
+      );
+      
+      const localProgress = loadLocalProgress();
+      const completedIdSet = loadCompletedIds();
+      
+      // Sync local progress with server progress (database is source of truth)
+      const store = { ...localProgress };
+      const key = "default";
+      const localSet = new Set(store[key] || []);
+      
+      // Add server-completed items to local storage
+      serverCompletedSet.forEach(index => {
+        localSet.add(index);
+      });
+      
+      store[key] = Array.from(localSet);
+      saveLocalProgress(store);
+      
+      // Also sync completed IDs
+      const newCompletedIds = new Set(completedIdSet);
+      modulesList.forEach((mod, index) => {
+        if (serverCompletedSet.has(index) && mod?._id) {
+          newCompletedIds.add(String(mod._id));
+        }
+      });
+      localStorage.setItem(LS_IDS_KEY, JSON.stringify(Array.from(newCompletedIds)));
+      
+      // Force UI update
+      setProgressUpdateTrigger(prev => prev + 1);
+      
+      console.log('[Progress Sync] Synced progress:', {
+        serverCompleted: Array.from(serverCompletedSet),
+        localCompleted: Array.from(localSet),
+        completedIds: Array.from(newCompletedIds)
+      });
+    } catch (error) {
+      console.error('[Progress Sync] Error:', error);
+    }
   };
 
   // Pull subject/board from user or onboardingData
@@ -770,14 +948,36 @@ const LearnDashboard = ({ onboardingData }) => {
     } catch (_) {}
   }, []);
 
+  // Refresh progress when window gains focus (user returns from lesson)
+  useEffect(() => {
+    const handleFocus = () => {
+      // Force a re-render by updating a dummy state
+      setHoveredIndex(prev => prev === null ? -1 : null);
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, []);
+
   const handleLogout = () => {
     try {
       localStorage.removeItem("learnOnboarded");
-      // Clear user-scoped cached progress on logout
+      // Clear ALL progress-related localStorage on logout
       if (USE_LOCAL_PROGRESS) {
         try {
+          // Clear user-scoped keys
           localStorage.removeItem(userScopedKey(LS_KEY_BASE));
           localStorage.removeItem(userScopedKey(LS_IDS_KEY_BASE));
+          
+          // Clear non-scoped keys (backward compatibility)
+          localStorage.removeItem(LS_KEY_BASE);
+          localStorage.removeItem(LS_IDS_KEY_BASE);
+          
+          // Clear any other progress-related keys
+          localStorage.removeItem("daily_streak_day");
+          localStorage.removeItem("daily_streak_count");
+          
+          console.log('[Logout] Cleared all progress localStorage');
         } catch (_) {}
       }
     } catch (_) {}
@@ -788,14 +988,105 @@ const LearnDashboard = ({ onboardingData }) => {
   };
 
   const levels = modulesList;
-  const serverCompletedSet = new Set(
-    (progress || [])
-      .filter((p) => p?.conceptCompleted)
-      .map((p) => (p?.chapter ? p.chapter - 1 : -1))
-      .filter((i) => i >= 0)
-  );
-  const localProgress = loadLocalProgress();
-  const completedIdSet = loadCompletedIds();
+  
+  // Force re-calculation of progress state when component updates
+  const [progressUpdateTrigger, setProgressUpdateTrigger] = useState(0);
+  
+  // Re-calculate progress state when trigger changes
+  const progressState = useMemo(() => {
+    const serverCompletedSet = new Set(
+      (progress || [])
+        .filter((p) => p?.conceptCompleted)
+        .map((p) => (p?.chapter ? p.chapter - 1 : -1))
+        .filter((i) => i >= 0)
+    );
+    const localProgress = loadLocalProgress();
+    const completedIdSet = loadCompletedIds();
+    
+    // Debug logging to help identify sync issues
+    console.log('[Dashboard Progress Debug]', {
+      serverProgress: progress || [],
+      serverCompletedSet: Array.from(serverCompletedSet),
+      localProgress,
+      completedIdSet: Array.from(completedIdSet),
+      modulesList: modulesList?.map((m, i) => ({ index: i, id: m?._id, title: m?.title }))
+    });
+    
+    return {
+      serverCompletedSet,
+      localProgress,
+      completedIdSet
+    };
+  }, [progress, progressUpdateTrigger, modulesList]);
+  
+  const { serverCompletedSet, localProgress, completedIdSet } = progressState;
+  
+  // Trigger progress update when returning to dashboard
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        setProgressUpdateTrigger(prev => prev + 1);
+        // Also sync progress when returning to dashboard
+        setTimeout(syncProgress, 100);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [progress, modulesList]);
+
+  // Auto-sync progress when component loads or progress changes
+  useEffect(() => {
+    if (progress && modulesList && modulesList.length > 0) {
+      // Small delay to ensure all data is loaded
+      const timeoutId = setTimeout(syncProgress, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [progress, modulesList]);
+
+  // Clear localStorage when user changes (account switching)
+  useEffect(() => {
+    if (user?._id) {
+      // Clear any existing localStorage from previous accounts
+      const clearPreviousAccountData = () => {
+        try {
+          // Clear non-scoped keys that might contain previous account data
+          localStorage.removeItem(LS_KEY_BASE);
+          localStorage.removeItem(LS_IDS_KEY_BASE);
+          console.log('[Account Switch] Cleared previous account localStorage');
+        } catch (_) {}
+      };
+      
+      clearPreviousAccountData();
+    }
+  }, [user?._id]);
+
+  // Refresh progress from database when user changes
+  useEffect(() => {
+    if (user?._id) {
+      const refreshProgress = async () => {
+        try {
+          console.log('[Dashboard] Refreshing progress from database for user:', user._id);
+          const response = await authService.getProgress(user._id);
+          if (response?.data) {
+            setProgress(response.data);
+            console.log('[Dashboard] Progress refreshed from database:', response.data);
+            
+            // Clear false completions after refreshing from database
+            setTimeout(() => {
+              clearFalseCompletions();
+            }, 500);
+          }
+        } catch (error) {
+          console.error('[Dashboard] Failed to refresh progress from database:', error);
+        }
+      };
+      
+      // Small delay to ensure user data is fully loaded
+      const timeoutId = setTimeout(refreshProgress, 1000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [user?._id]);
 
   // Note: firstIncompleteIndex will be computed per unit to reflect local/module-id completion
   const firstIncompleteIndex = levels.findIndex((_, i) => !serverCompletedSet.has(i));
@@ -915,6 +1206,19 @@ const LearnDashboard = ({ onboardingData }) => {
         </nav>
 
         <main className="flex-grow p-3 md:p-6 overflow-auto no-scrollbar bg-transparent mt-16 md:mt-0">
+          {/* Mobile Score Display - Fancy Extension Style - only visible on small screens */}
+          <div className="md:hidden fixed bottom-4 right-4 z-40">
+            <div className="bg-gradient-to-br from-yellow-50 via-yellow-100 to-orange-100 rounded-xl shadow-2xl border-2 border-yellow-300 p-3 flex items-center gap-2 min-w-[75px] backdrop-blur-sm">
+              <div className="relative">
+                <span className="text-yellow-600 text-xl drop-shadow-sm">⭐</span>
+                <div className="absolute inset-0 text-yellow-400 text-xl blur-sm opacity-50">⭐</div>
+              </div>
+              <span className="text-gray-800 font-extrabold text-sm bg-white/50 px-1.5 py-0.5 rounded-md">
+                {stars}
+              </span>
+            </div>
+          </div>
+
           {/* Section Header (hide when viewing chapters list). If units exist, headers are shown per unit below, so hide this top one. */}
           
 
@@ -1045,27 +1349,38 @@ const LearnDashboard = ({ onboardingData }) => {
                             </span>
                             <span className="font-bold hidden sm:inline">All Chapters</span>
                           </button>
+                          {/* Debug button to clear false completions */}
+                          <button 
+                            onClick={clearFalseCompletions} 
+                            className="flex items-center gap-2 py-2 px-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 transition-colors ring-1 ring-red-400/40 text-sm text-red-100"
+                            title="Clear false completions (Debug)"
+                          >
+                            <span className="text-xs">🔄</span>
+                            <span className="font-medium hidden sm:inline">Reset Progress</span>
+                          </button>
                         </div>
                       </div>
                       
                       {/* Render modules directly */}
                       <div className="relative flex flex-col items-center gap-16 sm:gap-20 md:gap-24 pt-20 sm:pt-24 md:pt-28 pb-6 sm:pb-8 px-8 sm:px-12 md:px-16 lg:px-20 xl:px-24">
                         {modulesList.map((mod, index) => {
-                          const p = progress.find((c) => c.chapter === index + 1);
+                          // --- Revised progress logic: track by module ID and lock correctly ---
                           const moduleIdHere = mod?._id;
-                          const localDoneByIndex = (localProgress["default"] || []).includes(index);
-                          const localDoneById = moduleIdHere ? completedIdSet.has(String(moduleIdHere)) : false;
-                          const firstIncompleteForUnit = modulesList.findIndex((_, i) => {
-                            const id = modulesList[i]?._id;
-                            const idxDone = (localProgress["default"] || []).includes(i);
-                            const idDone = id ? completedIdSet.has(String(id)) : false;
-                            const serverDone = progress.find((c) => c.chapter === i + 1 && c.conceptCompleted);
-                            return !(idxDone || idDone || serverDone);
+                          const isCompleted = moduleIdHere ? completedIdSet.has(String(moduleIdHere)) : false;
+
+                          // First module in this list that is not completed by ID
+                          const firstIncompleteForUnit = modulesList.findIndex((m) => {
+                            const id = m?._id;
+                            return id ? !completedIdSet.has(String(id)) : true;
                           });
+
                           let status = "locked";
-                          if ((p && p.conceptCompleted) || localDoneByIndex || localDoneById) status = "completed";
-                          else if (index === firstIncompleteForUnit) status = "active";
-                          const canClick = true;
+                          if (isCompleted) {
+                            status = "completed";
+                          } else if (index === firstIncompleteForUnit) {
+                            status = "active";
+                          }
+                          const canClick = (status === 'active' || status === 'completed');
                           const alignRight = index % 2 === 1;
                           const railColor = lighten("#2C6DEF", 0.45);
                           return (
@@ -1200,25 +1515,23 @@ const LearnDashboard = ({ onboardingData }) => {
                         /> ); })()}
                         <div className="relative flex flex-col items-center gap-16 sm:gap-20 md:gap-24 pt-20 sm:pt-24 md:pt-28 pb-6 sm:pb-8 px-8 sm:px-12 md:px-16 lg:px-20 xl:px-24">
                           {localLevels.map((mod, index) => {
-                            const p = progress.find((c) => c.chapter === index + 1);
-                            const moduleIdHere = unitMods[index]?._id;
-                            const localDoneByIndex = (localProgress[u?._id] || localProgress["default"] || []).includes(index);
-                            const localDoneById = moduleIdHere ? completedIdSet.has(String(moduleIdHere)) : false;
-                            // Compute per-unit first incomplete using module IDs
-                            const firstIncompleteForUnit = (() => {
-                              for (let i = 0; i < unitMods.length; i++) {
-                                const id = unitMods[i]?._id;
-                                const idxDone = (localProgress[u?._id] || localProgress["default"] || []).includes(i);
-                                const idDone = id ? completedIdSet.has(String(id)) : false;
-                                const serverDone = progress.find((c) => c.chapter === i + 1 && c.conceptCompleted);
-                                if (!(idxDone || idDone || serverDone)) return i;
-                              }
-                              return -1; // all completed -> no active star in this unit
-                            })();
+                            // --- Revised progress logic: track by module ID and lock correctly ---
+                            const moduleIdHere = mod?._id;
+                            const isCompleted = moduleIdHere ? completedIdSet.has(String(moduleIdHere)) : false;
+
+                            // First incomplete within THIS unit by ID
+                            const firstIncompleteForUnit = localLevels.findIndex((m) => {
+                              const id = m?._id;
+                              return id ? !completedIdSet.has(String(id)) : true;
+                            });
+
                             let status = "locked";
-                            if ((p && p.conceptCompleted) || localDoneByIndex || localDoneById) status = "completed";
-                            else if (index === firstIncompleteForUnit) status = "active";
-                            const canClick = true; // allow opening any module; adjust when per-module progress exists
+                            if (isCompleted) {
+                              status = "completed";
+                            } else if (index === firstIncompleteForUnit) {
+                              status = "active";
+                            }
+                            const canClick = (status === 'active' || status === 'completed');
                             const alignRight = index % 2 === 1;
                             const railColor = lighten(unitPalette[unitIdx % unitPalette.length], 0.45);
                             return (
@@ -1243,7 +1556,7 @@ const LearnDashboard = ({ onboardingData }) => {
                                           darkenFn={darken}
                                           onClick={() => {
                                             if (!canClick) return;
-                                            const moduleId = modulesList[index]?._id;
+                                            const moduleId = mod?._id;
                                             if (moduleId) navigate(`/learn/module/${moduleId}`);
                                             // Do NOT mark completed here; only count after module completion
                                           }}
@@ -1264,7 +1577,7 @@ const LearnDashboard = ({ onboardingData }) => {
                                           darkenFn={darken}
                                           onClick={() => {
                                             if (!canClick) return;
-                                            const moduleId = unitMods[index]?._id;
+                                            const moduleId = mod?._id;
                                             if (moduleId) navigate(`/learn/module/${moduleId}`);
                                             // Do NOT mark completed here; only count after module completion
                                           }}
@@ -1422,8 +1735,50 @@ const LearnDashboard = ({ onboardingData }) => {
               className="w-64 h-64 lg:w-72 lg:h-72 object-contain"
             />
           </div>
+          {/* Stars counter card */}
+          <div className="absolute top-6 right-4 w-[88%] bg-gradient-to-br from-yellow-50 to-orange-50 border-4 border-yellow-400 rounded-2xl px-4 py-3 shadow-[0_8px_0_0_rgba(0,0,0,0.10)] mb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl animate-pulse">⭐</span>
+                <div>
+                  <div className="text-xs font-extrabold text-yellow-700">
+                    Total Stars
+                  </div>
+                  <div className="text-lg font-extrabold text-yellow-600">
+                    {stars} stars
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    (localStorage: {localStorage.getItem('hs_stars_total_v1') || 'null'})
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => {
+                    const storedStars = localStorage.getItem('hs_stars_total_v1');
+                    const starCount = Number(storedStars);
+                    console.log('[LearnDashboard] Manual refresh - localStorage:', storedStars, 'parsed:', starCount);
+                    if (Number.isFinite(starCount)) {
+                      setTotal(starCount);
+                      console.log('[LearnDashboard] Manual refresh applied:', starCount);
+                    } else {
+                      console.warn('[LearnDashboard] Invalid star count in localStorage:', storedStars);
+                    }
+                  }}
+                  className="text-xs bg-yellow-200 hover:bg-yellow-300 px-2 py-1 rounded transition-colors"
+                >
+                  🔄
+                </button>
+                <div className="flex items-center">
+                  <span className="text-sm">✨</span>
+                  <span className="text-xs font-bold text-yellow-600 ml-1">Earned!</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           {/* Streak + Continue card */}
-          <div className="absolute top-6 right-4 w-[88%] bg-white border-4 border-blue-300 rounded-2xl px-4 py-3 shadow-[0_8px_0_0_rgba(0,0,0,0.10)]">
+          <div className="absolute top-28 right-4 w-[88%] bg-white border-4 border-blue-300 rounded-2xl px-4 py-3 shadow-[0_8px_0_0_rgba(0,0,0,0.10)]">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xl">🔥</span>

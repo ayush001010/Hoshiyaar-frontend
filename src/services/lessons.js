@@ -1,4 +1,23 @@
-const API_BASE = import.meta?.env?.VITE_API_BASE || 'http://hoshi-backend-env.eba-t92ieqn2.ap-southeast-2.elasticbeanstalk.com';
+// Get API base URL with mobile support
+const getAPIBase = () => {
+  if (typeof window === 'undefined') return '';
+  
+  const hostname = window.location.hostname;
+  const isLocalhost = /^(localhost|127\.0\.0\.1)/.test(hostname);
+  
+  if (isLocalhost) {
+    return ''; // Use Vite proxy in development
+  }
+  
+  // Check if we're accessing from mobile on local network
+  if (hostname === '192.168.1.11') {
+    return 'http://192.168.1.11:5000'; // Local network backend
+  }
+  
+  return import.meta?.env?.VITE_API_BASE || '';
+};
+
+const API_BASE = getAPIBase();
 
 // Fetch items for a module by its ObjectId (from curriculum flow)
 export async function fetchLessonItemsByModule(moduleId) {

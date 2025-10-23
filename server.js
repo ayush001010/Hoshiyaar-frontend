@@ -24,4 +24,5 @@ app.get('*', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`Access from mobile: http://192.168.1.11:${PORT}`);
 });

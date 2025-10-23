@@ -54,23 +54,43 @@ export const StarsProvider = ({ children }) => {
     timerRef.current = setTimeout(() => setDelta(0), 1200);
   };
 
+  // Allow consumers to explicitly set total points (used when backend returns new totals)
+  const setTotal = (next) => {
+    const n = Number(next);
+    if (!Number.isFinite(n)) return;
+    setStars(Math.max(0, n));
+    setDelta(0);
+  };
+
   // Idempotent scoring helpers per question
   const awardCorrect = (moduleId, questionId, points) => {
     if (!moduleId || !questionId || !Number.isFinite(points) || points <= 0) return;
+    console.log('[StarsContext] awardCorrect called:', { moduleId, questionId, points });
     setQuestionLedger((prev) => {
       const entry = prev[questionId] || { correct: false, penalized: false, pointsAwarded: 0, moduleId };
+      console.log('[StarsContext] Current entry:', entry);
+      
       if (entry.correct) {
+        console.log('[StarsContext] Question already answered correctly, skipping');
         return prev; // already counted best result
       }
+      
       const deltaPts = Math.max(0, points - (entry.pointsAwarded || 0)); // grant only the improvement
+      console.log('[StarsContext] Delta points to award:', deltaPts);
+      
       if (deltaPts > 0) {
-        setStars((s) => s + deltaPts);
+        setStars((s) => {
+          const newTotal = s + deltaPts;
+          console.log('[StarsContext] Updating stars:', s, '->', newTotal);
+          return newTotal;
+        });
         setModuleStars((m) => ({ ...m, [moduleId]: (m[moduleId] || 0) + deltaPts }));
         setDelta(deltaPts);
         if (timerRef.current) clearTimeout(timerRef.current);
         timerRef.current = setTimeout(() => setDelta(0), 1200);
       }
       const next = { ...prev, [questionId]: { ...entry, correct: true, pointsAwarded: Math.max(entry.pointsAwarded || 0, points) } };
+      console.log('[StarsContext] Updated ledger entry:', next[questionId]);
       return next;
     });
   };
@@ -110,7 +130,23 @@ export const StarsProvider = ({ children }) => {
     setDelta(0);
   };
 
-  const value = useMemo(() => ({ stars, addStars, delta, awardCorrect, awardWrong, getModuleStars, resetModuleLedger, resetAllStars }), [stars, delta, moduleStars, questionLedger]);
+  // Function to sync stars from server data
+  const syncFromServer = (serverStars, serverModuleStars = {}) => {
+    try {
+      const totalStars = Number(serverStars);
+      const moduleStarsData = typeof serverModuleStars === 'object' ? serverModuleStars : {};
+      
+      if (Number.isFinite(totalStars) && totalStars >= 0) {
+        setStars(totalStars);
+        setModuleStars(moduleStarsData);
+        console.log('[StarsContext] Synced from server:', { totalStars, moduleStarsData });
+      }
+    } catch (error) {
+      console.warn('[StarsContext] Failed to sync from server:', error);
+    }
+  };
+
+  const value = useMemo(() => ({ stars, addStars, setTotal, delta, awardCorrect, awardWrong, getModuleStars, resetModuleLedger, resetAllStars, syncFromServer }), [stars, delta, moduleStars, questionLedger]);
   return <StarsContext.Provider value={value}>{children}</StarsContext.Provider>;
 };
 
